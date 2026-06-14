@@ -392,6 +392,8 @@ canvas#game {
   font-family: inherit;
 }
 #workshop-link:hover { background: rgba(125, 249, 255, 0.12); }
+/* Hide back-link while playing so it doesn't overlap the SCORE/BEST HUD blocks */
+body:has(#hud:not(.hidden)) #workshop-link { display: none; }
 
 /* ---------- Sound button ---------- */
 .icon-btn {
