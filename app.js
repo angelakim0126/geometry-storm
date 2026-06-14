@@ -19,6 +19,20 @@ const CFG = {
   bossEvery: 5,
 };
 
+function isPrime(n) {
+  if (n < 2) return false;
+  if (n < 4) return true;
+  if (n % 2 === 0) return false;
+  for (let i = 3, lim = Math.floor(Math.sqrt(n)); i <= lim; i += 2) {
+    if (n % i === 0) return false;
+  }
+  return true;
+}
+
+// Vertex-side count per enemy shape (used for the "weak point" bonus).
+// Orbiter is a circle — no vertices, no bonus.
+const SHAPE_SIDES = { tri: 3, sq: 4, hex: 6, octa: 8, star: 10 };
+
 const MILESTONES = {
   5:  'ASTEROID BELT',
   10: 'NEBULA',
@@ -58,6 +72,7 @@ const state = {
   active: null,           // active power-up: { kind, untilT }
   bomb: false,
   milestonesHit: [],
+  vertexHits: 0,
   soundOn: localStorage.getItem('gs_sound') !== 'off',
   slowmo: 1,
 };
@@ -582,8 +597,9 @@ function killEnemy(e, fromPlayer = true) {
     if (e.kind === 'boss') sfx.bigKill();
     else sfx.kill();
 
-    // Maybe drop power-up
-    if (Math.random() < CFG.powerupDrop || e.kind === 'boss') {
+    // Maybe drop power-up (doubled on prime waves)
+    const dropChance = isPrime(state.wave) ? CFG.powerupDrop * 2 : CFG.powerupDrop;
+    if (Math.random() < dropChance || e.kind === 'boss') {
       spawnPowerup(e.x, e.y);
     }
   }
@@ -752,10 +768,16 @@ function startWave(n) {
   state.spawnTimer = 800;
   sfx.wave();
 
-  // Banner for milestones
-  if (MILESTONES[n] || n === 1) {
-    showBanner(`WAVE ${n}`, MILESTONES[n] || 'INCOMING');
-    if (MILESTONES[n]) state.milestonesHit.push({ wave: n, name: MILESTONES[n] });
+  // Banner — milestone name wins; otherwise PRIME if it's a prime wave (>= 2)
+  const milestoneName = MILESTONES[n];
+  const prime = isPrime(n);
+  if (milestoneName) {
+    showBanner(`WAVE ${n}${prime ? ' · PRIME' : ''}`, milestoneName);
+    state.milestonesHit.push({ wave: n, name: milestoneName });
+  } else if (prime) {
+    showBanner(`WAVE ${n}`, `PRIME · ${n} IS PRIME`);
+  } else if (n === 1) {
+    showBanner(`WAVE ${n}`, 'INCOMING');
   } else {
     showBanner(`WAVE ${n}`, '');
   }
@@ -800,15 +822,23 @@ function updateWave(dt) {
       state.spawnTimer = s.delay;
     }
   } else if (state.enemies.length === 0 && !state.betweenWaves) {
-    // Wave clear — gap before next wave starts
+    // Wave clear — gap before next wave starts. Triangular-number bonus
+    // (Σ from 1..N times 10), doubled on prime waves.
     state.betweenWaves = true;
-    state.score += 50 + state.wave * 10;
-    addFloatText(state.w / 2, state.h / 2, `WAVE CLEAR  +${50 + state.wave * 10}`, '#fff85d');
-    const nextWave = state.wave + 1;
+    const N = state.wave;
+    let bonus = N * (N + 1) * 5;       // = 10 * Σ(1..N)
+    const prime = isPrime(N);
+    if (prime) bonus *= 2;
+    state.score += bonus;
+    const label = prime
+      ? `Σ(1..${N})·10 ×2 PRIME = ${bonus}`
+      : `Σ(1..${N})·10 = ${bonus}`;
+    addFloatText(state.w / 2, state.h / 2, label, prime ? '#ff5dd2' : '#fff85d');
+    const nextWave = N + 1;
     setTimeout(() => {
       state.betweenWaves = false;
       if (state.mode === 'playing') startWave(nextWave);
-    }, 1200);
+    }, 1300);
   }
 }
 
@@ -825,6 +855,20 @@ function showBanner(sub, title) {
 }
 
 // ---------- Collisions ----------
+function vertexHitBonus(e, bx, by) {
+  // True when the bullet impact lines up with one of the polygon's
+  // vertices (within ~12°). Circles/orbiters have no vertices → false.
+  const sides = SHAPE_SIDES[e.shape];
+  if (!sides) return false;
+  const step = (Math.PI * 2) / sides;
+  let theta = Math.atan2(by - e.y, bx - e.x);
+  // Polygon vertex 0 is drawn at angle -PI/2, then ctx-rotated by spinPhase
+  theta -= (-Math.PI / 2) + e.spinPhase;
+  theta = ((theta % (Math.PI * 2)) + Math.PI * 3) % (Math.PI * 2) - Math.PI;
+  const nearest = Math.round(theta / step) * step;
+  return Math.abs(theta - nearest) < 0.21;   // ~12°
+}
+
 function updateCollisions() {
   const p = state.player;
   // Player bullets vs enemies
@@ -833,8 +877,16 @@ function updateCollisions() {
     for (let j = state.enemies.length - 1; j >= 0; j--) {
       const e = state.enemies[j];
       if (len(b.x - e.x, b.y - e.y) < e.r + CFG.bullet.r) {
-        e.hp--;
-        spawnParticles(b.x, b.y, '#ffffff', 4, 3, 280);
+        const vertex = vertexHitBonus(e, b.x, b.y);
+        const dmg = vertex ? 2 : 1;
+        e.hp -= dmg;
+        if (vertex) {
+          state.vertexHits++;
+          spawnParticles(b.x, b.y, '#fff85d', 16, 6, 600);
+          addFloatText(b.x, b.y - 8, '✦ VERTEX', '#fff85d');
+        } else {
+          spawnParticles(b.x, b.y, '#ffffff', 4, 3, 280);
+        }
         state.bullets.splice(i, 1);
         if (e.hp <= 0) killEnemy(e);
         else sfx.hit();
@@ -1085,6 +1137,7 @@ function startGame() {
   state.bomb = false;
   state.slowmo = 1;
   state.milestonesHit = [];
+  state.vertexHits = 0;
   state.t = 0;
   state.shake = 0;
   state.betweenWaves = false;
@@ -1119,6 +1172,7 @@ function gameOver() {
   document.getElementById('result-wave').textContent = state.wave;
   document.getElementById('result-combo').textContent = `x${state.bestCombo}`;
   document.getElementById('result-kills').textContent = state.kills;
+  document.getElementById('result-vertex').textContent = state.vertexHits;
   document.getElementById('result-title').textContent = state.wave >= 5 ? `Reached Wave ${state.wave}` : 'Game Over';
   document.getElementById('result-emoji').textContent = state.score >= state.best && state.score > 0 ? '🏆' : '💥';
 

@@ -110,6 +110,16 @@
         <p>Every 5 waves a boss appears. Survive it to unlock the next milestone.</p>
       </div>
       <div class="how-card">
+        <div class="how-icon">✦</div>
+        <h3>Vertex Hits</h3>
+        <p>Strike an enemy at one of its corners (vertices) for <b>2× damage</b>. Triangles have 3 weak points, hexagons 6, octagons 8. Orbiter circles have none.</p>
+      </div>
+      <div class="how-card">
+        <div class="how-icon">π</div>
+        <h3>Prime Waves</h3>
+        <p>Prime-numbered waves (2, 3, 5, 7, 11…) have <b>2× drop rate</b> and <b>2× clear bonus</b>. Wave-clear pays <b>Σ(1..N)·10</b> points — triangular numbers.</p>
+      </div>
+      <div class="how-card">
         <div class="how-icon">⌨️</div>
         <h3>Shortcuts</h3>
         <p><b>P</b> or <b>Esc</b> to pause<br/><b>B</b> to detonate a bomb if held<br/><b>M</b> to mute</p>
@@ -136,6 +146,7 @@
       <div><span class="stat-k">Wave Reached</span><span class="stat-v" id="result-wave">0</span></div>
       <div><span class="stat-k">Best Combo</span><span class="stat-v" id="result-combo">x1</span></div>
       <div><span class="stat-k">Kills</span><span class="stat-v" id="result-kills">0</span></div>
+      <div><span class="stat-k">✦ Vertex Hits</span><span class="stat-v" id="result-vertex">0</span></div>
     </div>
     <div class="milestone-list" id="milestone-list"></div>
     <button class="btn btn-primary" id="retry-btn">Try Again</button>
@@ -145,6 +156,6 @@
   <!-- Sound toggle -->
   <button id="sound-btn" class="icon-btn" title="Mute (M)">🔊</button>
 
-  <script src="app.js?v=20260614g"></script>
+  <script src="app.js?v=20260614h"></script>
 </body>
 </html>
