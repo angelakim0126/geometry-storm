@@ -432,6 +432,13 @@ body:has(#hud:not(.hidden)) #workshop-link { display: none; }
   .btn { padding: 12px 28px; font-size: 1rem; }
   .title-stats > div { min-width: 92px; padding: 10px 14px; }
   .stat-v { font-size: 1.3rem; }
+  /* Sound button is at top-left (34px wide + 12px gutter) — push the
+     hud-top row right so SCORE doesn't sit under it. Workshop link is
+     hidden during gameplay (rule above), so no right padding needed. */
+  .hud-top { padding-left: 46px; }
+  /* The Workshop pill grows with text — shrink it on mobile too */
+  #workshop-link { padding: 6px 11px; font-size: 0.74rem; }
+  .icon-btn { width: 34px; height: 34px; font-size: 1rem; }
 }
 
 /* Safe areas (iPhone notch) */
