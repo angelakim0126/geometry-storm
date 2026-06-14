@@ -130,6 +130,9 @@ canvas#game {
   margin: 8px 6px;
   font-family: inherit;
   transition: transform 0.1s ease, box-shadow 0.2s ease;
+  touch-action: manipulation;   /* override body touch-action:none so taps register on iOS */
+  position: relative;
+  z-index: 1;
 }
 .btn:active { transform: scale(0.96); }
 .btn-primary {
@@ -414,6 +417,8 @@ body:has(#hud:not(.hidden)) #workshop-link { display: none; }
   justify-content: center;
 }
 .icon-btn:hover { background: rgba(125, 249, 255, 0.1); }
+.icon-btn { touch-action: manipulation; }
+#workshop-link { touch-action: manipulation; }
 
 /* ---------- Mobile tweaks ---------- */
 @media (max-width: 600px) {

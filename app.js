@@ -1152,7 +1152,10 @@ function updateTitleStats() {
 }
 
 // ---------- Wire UI ----------
-document.getElementById('start-btn').onclick = () => { audio(); startGame(); };
+document.getElementById('start-btn').onclick = () => {
+  try { audio(); } catch (e) { /* mobile may block AudioContext — keep going, sfx is non-critical */ }
+  startGame();
+};
 document.getElementById('how-btn').onclick = () => {
   document.getElementById('title').classList.add('hidden');
   document.getElementById('how').classList.remove('hidden');
