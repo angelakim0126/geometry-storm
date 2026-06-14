@@ -122,6 +122,7 @@ const input = {
   aimX: 0, aimY: -1,                  // unit vector
   moveX: 0, moveY: 0,
   shooting: false,
+  touchAimActive: false,              // true only while right stick is held
 };
 
 document.addEventListener('keydown', e => {
@@ -198,9 +199,9 @@ if (isTouch) {
     if (active && (dx !== 0 || dy !== 0)) {
       const d = len(dx, dy);
       input.aimX = dx / d; input.aimY = dy / d;
-      input.shooting = d > 0.1;
+      input.touchAimActive = true;
     } else {
-      input.shooting = false;
+      input.touchAimActive = false;
     }
   });
 }
@@ -312,22 +313,18 @@ function updatePlayer(p, dt) {
   p.x = clamp(p.x + p.vx, p.r, state.w - p.r);
   p.y = clamp(p.y + p.vy, p.r, state.h - p.r);
 
-  // Aim
-  if (isTouch) {
-    if (input.shooting) {
-      p.angle = Math.atan2(input.aimY, input.aimX);
-    }
-    // On touch, shooting only happens when the right stick is engaged
-  } else {
-    if (input.mouse.present) {
-      p.angle = Math.atan2(input.mouse.y - p.y, input.mouse.x - p.x);
-    } else if (len(p.vx, p.vy) > 0.5) {
-      // No mouse yet — aim in direction of motion
-      p.angle = Math.atan2(p.vy, p.vx);
-    }
-    // Desktop: auto-fire is always on
-    input.shooting = true;
+  // Aim — right joystick (while held) wins, then mouse, then motion
+  // direction. Auto-fire is always on while playing — the player focuses
+  // on aiming + dodging, not on pressing a fire button.
+  if (input.touchAimActive) {
+    p.angle = Math.atan2(input.aimY, input.aimX);
+  } else if (input.mouse.present) {
+    p.angle = Math.atan2(input.mouse.y - p.y, input.mouse.x - p.x);
+  } else if (len(p.vx, p.vy) > 0.5) {
+    p.angle = Math.atan2(p.vy, p.vx);
   }
+  // else: keep last p.angle (initially -PI/2, i.e. straight up)
+  input.shooting = true;
 
   // Fire
   const fireDelay = (state.active && state.active.kind === 'rapid') ? 70 : CFG.player.fireRate;
