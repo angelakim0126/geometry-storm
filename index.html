@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#05060f" />
+  <title>Geometry Storm</title>
+  <link rel="stylesheet" href="styles.css?v=20260614" />
+</head>
+<body>
+  <a href="https://angelakim0126.github.io/" aria-label="Back to Angela's Workshop" id="workshop-link">← Workshop</a>
+  <canvas id="game"></canvas>
+
+  <!-- HUD -->
+  <div id="hud" class="hidden">
+    <div class="hud-row hud-top">
+      <div class="hud-block">
+        <div class="hud-label">SCORE</div>
+        <div class="hud-value" id="score">0</div>
+      </div>
+      <div class="hud-block">
+        <div class="hud-label">WAVE</div>
+        <div class="hud-value" id="wave">1</div>
+      </div>
+      <div class="hud-block">
+        <div class="hud-label">BEST</div>
+        <div class="hud-value" id="best">0</div>
+      </div>
+    </div>
+    <div class="hud-row hud-mid">
+      <div class="combo" id="combo">x1</div>
+    </div>
+    <div class="hud-row hud-bottom">
+      <div class="lives" id="lives"></div>
+      <div class="powerup" id="powerup"></div>
+    </div>
+  </div>
+
+  <!-- Mobile touch joysticks -->
+  <div id="touch" class="hidden">
+    <div class="stick-zone stick-zone-left">
+      <div class="stick" id="stick-move">
+        <div class="stick-knob" id="knob-move"></div>
+      </div>
+    </div>
+    <div class="stick-zone stick-zone-right">
+      <div class="stick" id="stick-aim">
+        <div class="stick-knob" id="knob-aim"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Milestone banner -->
+  <div id="banner" class="hidden">
+    <div class="banner-sub" id="banner-sub">WAVE 5</div>
+    <div class="banner-title" id="banner-title">ASTEROID BELT</div>
+  </div>
+
+  <!-- Title screen -->
+  <div id="title" class="screen">
+    <div class="title-art" aria-hidden="true">
+      <svg viewBox="0 0 200 200" width="160" height="160">
+        <polygon points="100,20 180,180 20,180" fill="none" stroke="#7df9ff" stroke-width="3" stroke-linejoin="round" />
+        <polygon points="100,55 150,160 50,160" fill="none" stroke="#ff5dd2" stroke-width="2.5" stroke-linejoin="round" />
+        <polygon points="100,90 122,140 78,140" fill="none" stroke="#fff85d" stroke-width="2" stroke-linejoin="round" />
+      </svg>
+    </div>
+    <h1>GEOMETRY <span class="storm">STORM</span></h1>
+    <p class="tagline">Survive the waves. Build the combo. Beat the score.</p>
+
+    <div class="title-stats">
+      <div><span class="stat-k">High Score</span><span class="stat-v" id="title-best">0</span></div>
+      <div><span class="stat-k">Best Wave</span><span class="stat-v" id="title-wave">0</span></div>
+      <div><span class="stat-k">Total Kills</span><span class="stat-v" id="title-kills">0</span></div>
+    </div>
+
+    <button class="btn btn-primary" id="start-btn">START</button>
+    <button class="btn btn-ghost" id="how-btn">How to Play</button>
+
+    <div class="footer-tag">A personal project · Made by Mom for George</div>
+  </div>
+
+  <!-- How-to overlay -->
+  <div id="how" class="screen hidden">
+    <h2>How to Play</h2>
+    <div class="how-grid">
+      <div class="how-card">
+        <div class="how-icon">🎮</div>
+        <h3>Desktop</h3>
+        <p><b>WASD</b> or <b>Arrows</b> to move<br/><b>Mouse</b> to aim<br/>You auto-fire — focus on dodging</p>
+      </div>
+      <div class="how-card">
+        <div class="how-icon">📱</div>
+        <h3>Mobile</h3>
+        <p><b>Left stick</b> to move<br/><b>Right stick</b> to aim<br/>Auto-fire when aiming</p>
+      </div>
+      <div class="how-card">
+        <div class="how-icon">⚡</div>
+        <h3>Power-ups</h3>
+        <p>Glowing drops give Rapid Fire, Triple Shot, Shield, Slow-mo, or a screen-clearing Bomb</p>
+      </div>
+      <div class="how-card">
+        <div class="how-icon">🔥</div>
+        <h3>Combos</h3>
+        <p>Chain kills before your combo expires for huge score multipliers — up to <b>x10</b></p>
+      </div>
+      <div class="how-card">
+        <div class="how-icon">👹</div>
+        <h3>Bosses</h3>
+        <p>Every 5 waves a boss appears. Survive it to unlock the next milestone.</p>
+      </div>
+      <div class="how-card">
+        <div class="how-icon">⌨️</div>
+        <h3>Shortcuts</h3>
+        <p><b>P</b> or <b>Esc</b> to pause<br/><b>B</b> to detonate a bomb if held<br/><b>M</b> to mute</p>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="how-back">Back</button>
+  </div>
+
+  <!-- Pause overlay -->
+  <div id="pause" class="screen hidden">
+    <h2>Paused</h2>
+    <button class="btn btn-primary" id="resume-btn">Resume</button>
+    <button class="btn btn-ghost" id="quit-btn">Quit to Title</button>
+  </div>
+
+  <!-- Game over screen -->
+  <div id="gameover" class="screen hidden">
+    <div class="result-emoji" id="result-emoji">💥</div>
+    <h2 id="result-title">Wave 3 — Cleared</h2>
+    <div class="result-stats">
+      <div><span class="stat-k">Score</span><span class="stat-v" id="result-score">0</span></div>
+      <div><span class="stat-k">Wave Reached</span><span class="stat-v" id="result-wave">0</span></div>
+      <div><span class="stat-k">Best Combo</span><span class="stat-v" id="result-combo">x1</span></div>
+      <div><span class="stat-k">Kills</span><span class="stat-v" id="result-kills">0</span></div>
+    </div>
+    <div class="milestone-list" id="milestone-list"></div>
+    <button class="btn btn-primary" id="retry-btn">Try Again</button>
+    <button class="btn btn-ghost" id="title-btn">Title Screen</button>
+  </div>
+
+  <!-- Sound toggle -->
+  <button id="sound-btn" class="icon-btn" title="Mute (M)">🔊</button>
+
+  <script src="app.js?v=20260614"></script>
+</body>
+</html>
