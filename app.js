@@ -9,8 +9,8 @@ const ctx = cvs.getContext('2d');
 
 // ---------- Config ----------
 const CFG = {
-  player: { r: 12, accel: 0.55, maxSpeed: 6.2, friction: 0.92, fireRate: 160, bulletSpeed: 11, invulnMs: 1200 },
-  bullet: { r: 5.5, life: 900 },
+  player: { r: 12, accel: 0.55, maxSpeed: 6.2, friction: 0.92, fireRate: 160, invulnMs: 1200 },
+  bullet: { r: 5.5, speed: 11, life: 900 },
   enemyBullet: { r: 5, speed: 4.2, life: 4000 },
   combo: { decayMs: 2200, max: 10 },
   powerupDrop: 0.13,
