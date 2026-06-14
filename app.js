@@ -1129,10 +1129,22 @@ document.getElementById('start-btn').onclick = () => { audio(); startGame(); };
 document.getElementById('how-btn').onclick = () => {
   document.getElementById('title').classList.add('hidden');
   document.getElementById('how').classList.remove('hidden');
+  document.getElementById('how-back').classList.remove('hidden');
+  document.getElementById('how-back-pause').classList.add('hidden');
 };
 document.getElementById('how-back').onclick = () => {
   document.getElementById('how').classList.add('hidden');
   document.getElementById('title').classList.remove('hidden');
+};
+document.getElementById('how-from-pause').onclick = () => {
+  document.getElementById('pause').classList.add('hidden');
+  document.getElementById('how').classList.remove('hidden');
+  document.getElementById('how-back').classList.add('hidden');
+  document.getElementById('how-back-pause').classList.remove('hidden');
+};
+document.getElementById('how-back-pause').onclick = () => {
+  document.getElementById('how').classList.add('hidden');
+  document.getElementById('pause').classList.remove('hidden');
 };
 document.getElementById('resume-btn').onclick = togglePause;
 document.getElementById('quit-btn').onclick = () => {
