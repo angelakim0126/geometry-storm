@@ -10,7 +10,7 @@ const ctx = cvs.getContext('2d');
 // ---------- Config ----------
 const CFG = {
   player: { r: 12, accel: 0.55, maxSpeed: 6.2, friction: 0.92, fireRate: 160, bulletSpeed: 11, invulnMs: 1200 },
-  bullet: { r: 4, life: 900 },
+  bullet: { r: 5.5, life: 900 },
   enemyBullet: { r: 5, speed: 4.2, life: 4000 },
   combo: { decayMs: 2200, max: 10 },
   powerupDrop: 0.13,
@@ -313,17 +313,29 @@ function updatePlayer(p, dt) {
   p.x = clamp(p.x + p.vx, p.r, state.w - p.r);
   p.y = clamp(p.y + p.vy, p.r, state.h - p.r);
 
-  // Aim — right joystick (while held) wins, then mouse, then motion
-  // direction. Auto-fire is always on while playing — the player focuses
-  // on aiming + dodging, not on pressing a fire button.
+  // Aim — right joystick (while held) wins, then mouse. If neither is
+  // engaged, auto-aim at the nearest enemy so the player can focus on
+  // dodging. Auto-fire is always on while playing.
   if (input.touchAimActive) {
     p.angle = Math.atan2(input.aimY, input.aimX);
   } else if (input.mouse.present) {
     p.angle = Math.atan2(input.mouse.y - p.y, input.mouse.x - p.x);
-  } else if (len(p.vx, p.vy) > 0.5) {
-    p.angle = Math.atan2(p.vy, p.vx);
+  } else {
+    // Auto-aim at nearest enemy
+    let best = null, bestD = Infinity;
+    for (const e of state.enemies) {
+      const d = len(e.x - p.x, e.y - p.y);
+      if (d < bestD) { bestD = d; best = e; }
+    }
+    if (best) {
+      const targetA = Math.atan2(best.y - p.y, best.x - p.x);
+      // Smoothly rotate toward target so it doesn't snap
+      const diff = ((targetA - p.angle + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
+      p.angle += clamp(diff, -0.25, 0.25);
+    } else if (len(p.vx, p.vy) > 0.5) {
+      p.angle = Math.atan2(p.vy, p.vx);
+    }
   }
-  // else: keep last p.angle (initially -PI/2, i.e. straight up)
   input.shooting = true;
 
   // Fire
@@ -931,13 +943,26 @@ function draw() {
   // Power-ups
   for (const u of state.powerups) drawPowerup(u);
 
-  // Bullets
-  ctx.fillStyle = '#7df9ff';
+  // Bullets — with a short trail for visibility
   ctx.shadowColor = '#7df9ff';
-  ctx.shadowBlur = 14;
+  ctx.shadowBlur = 18;
   for (const b of state.bullets) {
+    // Trail
+    ctx.strokeStyle = 'rgba(125, 249, 255, 0.55)';
+    ctx.lineWidth = CFG.bullet.r * 1.4;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(b.x, b.y);
+    ctx.lineTo(b.x - b.vx * 1.6, b.y - b.vy * 1.6);
+    ctx.stroke();
+    // Bright core
+    ctx.fillStyle = '#ffffff';
     ctx.beginPath();
     ctx.arc(b.x, b.y, CFG.bullet.r, 0, TAU);
+    ctx.fill();
+    ctx.fillStyle = '#7df9ff';
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, CFG.bullet.r * 0.6, 0, TAU);
     ctx.fill();
   }
 
