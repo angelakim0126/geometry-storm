@@ -799,12 +799,16 @@ function updateWave(dt) {
       state.enemies.push(spawnEnemyAtEdge(s.kind));
       state.spawnTimer = s.delay;
     }
-  } else if (state.enemies.length === 0) {
-    // Wave clear
+  } else if (state.enemies.length === 0 && !state.betweenWaves) {
+    // Wave clear — gap before next wave starts
+    state.betweenWaves = true;
     state.score += 50 + state.wave * 10;
     addFloatText(state.w / 2, state.h / 2, `WAVE CLEAR  +${50 + state.wave * 10}`, '#fff85d');
-    setTimeout(() => startWave(state.wave + 1), 1200);
-    state.spawnQueue = [{ kind: '__wait__', delay: 999999 }];  // sentinel to pause
+    const nextWave = state.wave + 1;
+    setTimeout(() => {
+      state.betweenWaves = false;
+      if (state.mode === 'playing') startWave(nextWave);
+    }, 1200);
   }
 }
 
@@ -1083,6 +1087,7 @@ function startGame() {
   state.milestonesHit = [];
   state.t = 0;
   state.shake = 0;
+  state.betweenWaves = false;
 
   document.getElementById('hud').classList.remove('hidden');
   document.getElementById('title').classList.add('hidden');
