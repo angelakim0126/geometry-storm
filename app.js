@@ -96,6 +96,9 @@ const SHIPS = {
   titan:   { name: 'Titan',   icon: '🛡️', cost: 1200, color: '#6ee7b7', desc: '+2 lives · −15% speed.',             mods: { livesAdd: 2, speedMul: 0.85 } },
   crystal: { name: 'Crystal', icon: '💎', cost: 2200, color: '#ff5dd2', desc: '+1 base damage · −20% fire rate.',   mods: { dmgAdd: 1, fireMul: 1.2 } },
   phantom: { name: 'Phantom', icon: '🌟', cost: 3500, color: '#fa5400', desc: 'Smaller hitbox · +25% speed.',       mods: { hitboxMul: 0.7, speedMul: 1.25 } },
+  vortex:  { name: 'Vortex',  icon: '🌀', cost: 4500, color: '#c084fc', desc: 'Shots briefly slow enemies they hit.',mods: { bulletEffect: 'slow' } },
+  comet:   { name: 'Comet',   icon: '☄️', cost: 6500, color: '#ff8c42', desc: 'Bullets explode on impact (small AoE).', mods: { bulletEffect: 'explode' } },
+  trident: { name: 'Trident', icon: '🔱', cost: 9000, color: '#5ee3e0', desc: 'Always triple-shot · −25% fire rate.',  mods: { fireMul: 1.25, alwaysTriple: true } },
 };
 
 function loadUpgrades() {
@@ -297,7 +300,12 @@ function computeLoadout() {
   const lives = Math.max(1, 3 + u.hull + (mods.livesAdd ?? 0));
   const bulletDmg = 1 + u.damage + (mods.dmgAdd ?? 0);
   const hitboxMul = mods.hitboxMul ?? 1;
-  return { fireRate, maxSpeed, lives, bulletDmg, hitboxMul, color: ship.color };
+  return {
+    fireRate, maxSpeed, lives, bulletDmg, hitboxMul,
+    color: ship.color,
+    bulletEffect: mods.bulletEffect || null,    // 'slow' | 'explode' | null
+    alwaysTriple: !!mods.alwaysTriple,
+  };
 }
 
 function makePlayer() {
@@ -316,6 +324,8 @@ function makePlayer() {
     maxSpeed: lo.maxSpeed,
     bulletDmg: lo.bulletDmg,
     color: lo.color,
+    bulletEffect: lo.bulletEffect,
+    alwaysTriple: lo.alwaysTriple,
   };
 }
 
@@ -430,6 +440,64 @@ const SHIP_DRAW = {
     ctx.moveTo(r * 0.3, 0); ctx.lineTo(-r * 0.55, 0);
     ctx.stroke();
   },
+  vortex(r) {
+    // Crescent / sickle — outer arc curving around a central core
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 1.05, -Math.PI * 0.65, Math.PI * 0.65, false);
+    ctx.lineTo(r * 0.35, 0);
+    ctx.arc(0, 0, r * 0.55, Math.PI * 0.65, -Math.PI * 0.65, true);
+    ctx.closePath();
+    ctx.stroke();
+    // Central core + small inner orbit ring
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 0.22, 0, TAU);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 0.42, -Math.PI * 0.3, Math.PI * 0.3);
+    ctx.stroke();
+  },
+  comet(r) {
+    // Compact teardrop with twin curved fins — looks like a missile
+    ctx.beginPath();
+    ctx.moveTo(r * 1.4, 0);
+    ctx.bezierCurveTo(r * 0.9, -r * 0.55, r * 0.0, -r * 0.5, -r * 0.7, -r * 0.3);
+    ctx.lineTo(-r * 0.85, 0);
+    ctx.lineTo(-r * 0.7, r * 0.3);
+    ctx.bezierCurveTo(r * 0.0, r * 0.5, r * 0.9, r * 0.55, r * 1.4, 0);
+    ctx.closePath();
+    ctx.stroke();
+    // Curved fins
+    ctx.beginPath();
+    ctx.moveTo(-r * 0.1, -r * 0.45);
+    ctx.quadraticCurveTo(-r * 0.6, -r * 0.95, -r * 0.95, -r * 0.5);
+    ctx.moveTo(-r * 0.1,  r * 0.45);
+    ctx.quadraticCurveTo(-r * 0.6,  r * 0.95, -r * 0.95,  r * 0.5);
+    ctx.stroke();
+    // Cockpit dot
+    ctx.beginPath();
+    ctx.arc(r * 0.55, 0, r * 0.13, 0, TAU);
+    ctx.stroke();
+  },
+  trident(r) {
+    // Three-prong forward attack — like a trident
+    ctx.beginPath();
+    ctx.moveTo(r * 1.4, -r * 0.55);          // top prong tip
+    ctx.lineTo(r * 0.5, -r * 0.4);
+    ctx.lineTo(r * 1.4, 0);                  // center prong tip
+    ctx.lineTo(r * 0.5,  r * 0.4);
+    ctx.lineTo(r * 1.4,  r * 0.55);          // bottom prong tip
+    ctx.lineTo(r * 0.35, r * 0.7);           // wing tip lower
+    ctx.lineTo(-r * 0.55, r * 0.6);
+    ctx.lineTo(-r * 0.95, 0);
+    ctx.lineTo(-r * 0.55, -r * 0.6);
+    ctx.lineTo(r * 0.35, -r * 0.7);          // wing tip upper
+    ctx.closePath();
+    ctx.stroke();
+    // Central spine
+    ctx.beginPath();
+    ctx.moveTo(r * 0.5, 0); ctx.lineTo(-r * 0.55, 0);
+    ctx.stroke();
+  },
 };
 
 // Per-ship engine attachment points (offsets from ship center in local
@@ -440,6 +508,9 @@ const SHIP_ENGINES = {
   titan:   [{ x: -0.9, y: -0.35 }, { x: -0.9, y: 0 }, { x: -0.9, y: 0.35 }],
   crystal: [{ x: -0.55, y: 0 }],
   phantom: [{ x: -0.78, y: 0 }],
+  vortex:  [{ x: -0.5, y: -0.55 }, { x: -0.5, y: 0.55 }],
+  comet:   [{ x: -0.85, y: 0 }],
+  trident: [{ x: -0.95, y: -0.18 }, { x: -0.95, y: 0.18 }],
 };
 
 function drawPlayer(p) {
@@ -557,8 +628,9 @@ function updatePlayer(p, dt) {
 }
 
 function fireBullets(p) {
-  const triple = state.active && state.active.kind === 'triple';
+  const triple = (state.active && state.active.kind === 'triple') || p.alwaysTriple;
   const spread = triple ? [-0.22, 0, 0.22] : [0];
+  const effect = p.bulletEffect || null;
   for (const off of spread) {
     const a = p.angle + off;
     state.bullets.push({
@@ -569,6 +641,8 @@ function fireBullets(p) {
       life: CFG.bullet.life,
       age: 0,
       dmg: p.bulletDmg || 1,
+      effect,
+      color: p.color,
     });
   }
 }
@@ -678,8 +752,9 @@ function updateEnemy(e, dt) {
     }
   }
 
-  e.x += e.vx * state.slowmo;
-  e.y += e.vy * state.slowmo;
+  const slowMul = (e.slowUntil && state.t < e.slowUntil) ? 0.4 : 1;
+  e.x += e.vx * state.slowmo * slowMul;
+  e.y += e.vy * state.slowmo * slowMul;
 }
 
 function enemyShoot(e) {
@@ -1135,6 +1210,31 @@ function updateCollisions() {
         } else {
           spawnParticles(b.x, b.y, '#ffffff', 4, 3, 280);
         }
+
+        // Ship-specific bullet effect
+        if (b.effect === 'slow') {
+          // Vortex — slow this enemy briefly
+          e.slowUntil = state.t + 900;
+          spawnParticles(b.x, b.y, '#c084fc', 10, 3, 500);
+        } else if (b.effect === 'explode') {
+          // Comet — small AoE around impact
+          const aoeR = 64;
+          const aoeDmg = Math.max(1, Math.floor(baseDmg * 0.6));
+          for (const e2 of state.enemies) {
+            if (e2 === e) continue;
+            const d = len(e2.x - b.x, e2.y - b.y);
+            if (d < aoeR + e2.r) e2.hp -= aoeDmg;
+          }
+          // Visual: orange burst + screen shake
+          spawnParticles(b.x, b.y, '#ff8c42', 24, 8, 600);
+          shake(6);
+          // Kill anything that dropped to 0 from the AoE — iterate backward
+          for (let k = state.enemies.length - 1; k >= 0; k--) {
+            const e3 = state.enemies[k];
+            if (e3 !== e && e3.hp <= 0) killEnemy(e3);
+          }
+        }
+
         state.bullets.splice(i, 1);
         if (e.hp <= 0) killEnemy(e);
         else sfx.hit();
@@ -1685,6 +1785,54 @@ function drawShipInto(c, shipId, r) {
     c.beginPath();
     c.arc(r * 0.7, 0, r * 0.14, 0, Math.PI * 2);
     c.moveTo(r * 0.3, 0); c.lineTo(-r * 0.55, 0);
+    c.stroke();
+  } else if (shipId === 'vortex') {
+    c.beginPath();
+    c.arc(0, 0, r * 1.05, -Math.PI * 0.65, Math.PI * 0.65, false);
+    c.lineTo(r * 0.35, 0);
+    c.arc(0, 0, r * 0.55, Math.PI * 0.65, -Math.PI * 0.65, true);
+    c.closePath();
+    c.stroke();
+    c.beginPath();
+    c.arc(0, 0, r * 0.22, 0, Math.PI * 2);
+    c.stroke();
+    c.beginPath();
+    c.arc(0, 0, r * 0.42, -Math.PI * 0.3, Math.PI * 0.3);
+    c.stroke();
+  } else if (shipId === 'comet') {
+    c.beginPath();
+    c.moveTo(r * 1.4, 0);
+    c.bezierCurveTo(r * 0.9, -r * 0.55, r * 0.0, -r * 0.5, -r * 0.7, -r * 0.3);
+    c.lineTo(-r * 0.85, 0);
+    c.lineTo(-r * 0.7, r * 0.3);
+    c.bezierCurveTo(r * 0.0, r * 0.5, r * 0.9, r * 0.55, r * 1.4, 0);
+    c.closePath();
+    c.stroke();
+    c.beginPath();
+    c.moveTo(-r * 0.1, -r * 0.45);
+    c.quadraticCurveTo(-r * 0.6, -r * 0.95, -r * 0.95, -r * 0.5);
+    c.moveTo(-r * 0.1,  r * 0.45);
+    c.quadraticCurveTo(-r * 0.6,  r * 0.95, -r * 0.95,  r * 0.5);
+    c.stroke();
+    c.beginPath();
+    c.arc(r * 0.55, 0, r * 0.13, 0, Math.PI * 2);
+    c.stroke();
+  } else if (shipId === 'trident') {
+    c.beginPath();
+    c.moveTo(r * 1.4, -r * 0.55);
+    c.lineTo(r * 0.5, -r * 0.4);
+    c.lineTo(r * 1.4, 0);
+    c.lineTo(r * 0.5,  r * 0.4);
+    c.lineTo(r * 1.4,  r * 0.55);
+    c.lineTo(r * 0.35, r * 0.7);
+    c.lineTo(-r * 0.55, r * 0.6);
+    c.lineTo(-r * 0.95, 0);
+    c.lineTo(-r * 0.55, -r * 0.6);
+    c.lineTo(r * 0.35, -r * 0.7);
+    c.closePath();
+    c.stroke();
+    c.beginPath();
+    c.moveTo(r * 0.5, 0); c.lineTo(-r * 0.55, 0);
     c.stroke();
   } else {
     // scout
