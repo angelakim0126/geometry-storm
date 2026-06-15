@@ -392,27 +392,42 @@ canvas#game {
 }
 
 /* ---------- Shop ---------- */
+/* Override the centered screen layout so the shop flows from the top and
+   scrolls cleanly. Without this, large-screen users with many cards see
+   the wallet pushed above the viewport. */
+#shop {
+  justify-content: flex-start;
+  padding-top: 14px;
+  padding-bottom: 30px;
+}
 .shop-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   width: 100%;
   max-width: 760px;
   margin-bottom: 8px;
+  padding: 6px 12px;
   gap: 16px;
+  background: rgba(5, 6, 15, 0.92);
+  border-radius: 12px;
+  backdrop-filter: blur(8px);
 }
 .shop-header h2 {
-  font-size: 1.8rem;
+  font-size: 1.5rem;
   margin: 0;
   color: var(--accent-3);
 }
 .shop-wallet {
   color: var(--ink-soft);
-  font-size: 1rem;
+  font-size: 0.95rem;
 }
 .shop-wallet b {
   color: var(--accent-3);
-  font-size: 1.25rem;
+  font-size: 1.2rem;
   font-variant-numeric: tabular-nums;
   font-weight: 800;
 }

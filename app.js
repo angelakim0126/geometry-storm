@@ -1056,7 +1056,19 @@ function updateWave(dt) {
       state.enemies.push(spawnEnemyAtEdge(s.kind));
       state.spawnTimer = s.delay;
     }
-  } else if (state.enemies.length === 0 && !state.betweenWaves) {
+  } else {
+    // Cull enemies that have wandered far off-screen (zoomers commit to a
+    // direction and have no friction, so a missed pass can leave one drifting
+    // forever — that used to freeze the wave's clear condition).
+    const margin = 600;
+    for (let i = state.enemies.length - 1; i >= 0; i--) {
+      const e = state.enemies[i];
+      if (e.x < -margin || e.x > state.w + margin || e.y < -margin || e.y > state.h + margin) {
+        state.enemies.splice(i, 1);
+      }
+    }
+  }
+  if (state.spawnQueue.length === 0 && state.enemies.length === 0 && !state.betweenWaves) {
     // Wave clear — gap before next wave starts. Triangular-number bonus
     // (Σ from 1..N times 10), doubled on prime waves.
     state.betweenWaves = true;
