@@ -1555,8 +1555,8 @@ function renderShop() {
 
 function drawShipPreview(canvas, shipId) {
   const dpr = window.devicePixelRatio || 1;
-  const w = canvas.width = 160 * dpr;
-  const h = canvas.height = 80 * dpr;
+  canvas.width = 160 * dpr;
+  canvas.height = 80 * dpr;
   canvas.style.width = '160px';
   canvas.style.height = '80px';
   const c = canvas.getContext('2d');
@@ -1567,31 +1567,22 @@ function drawShipPreview(canvas, shipId) {
   const r = 26;
   const cx = 80, cy = 40;
 
-  // Save the live game ctx + state.ship, swap to our mini canvas so we can
-  // reuse SHIP_DRAW (which closes over the global `ctx`).
-  const savedCtx = ctx;
-  const savedShip = state.ship;
-  // eslint-disable-next-line
-  window.ctx = c;        // SHIP_DRAW uses `ctx` from script scope — overwrite is not possible.
-  // Inline a simplified renderer using the local ctx `c`.
   c.save();
   c.translate(cx, cy);
-  // Slight downward tilt looks more dynamic than dead-flat
-  c.rotate(-0.06);
+  c.rotate(-0.06);    // slight tilt looks more dynamic than flat
   c.strokeStyle = ship.color;
   c.shadowColor = ship.color;
   c.shadowBlur = 14;
   c.lineWidth = 2.5;
 
-  // Trail
+  // Thrust glow
   c.save();
   const grad = c.createLinearGradient(-r * 0.6, 0, -r * 1.8, 0);
   grad.addColorStop(0, ship.color);
   grad.addColorStop(1, 'rgba(0,0,0,0)');
-  c.globalAlpha = 0.7;
+  c.globalAlpha = 0.75;
   c.fillStyle = grad;
-  const eng = (SHIP_ENGINES[shipId] || SHIP_ENGINES.scout);
-  for (const e of eng) {
+  for (const e of (SHIP_ENGINES[shipId] || SHIP_ENGINES.scout)) {
     const ex = e.x * r, ey = e.y * r;
     c.beginPath();
     c.moveTo(ex, ey - r * 0.13);
@@ -1602,12 +1593,8 @@ function drawShipPreview(canvas, shipId) {
   }
   c.restore();
 
-  // Ship body — duplicate the SHIP_DRAW code against the local ctx
   drawShipInto(c, shipId, r);
-
   c.restore();
-  window.ctx = savedCtx;
-  state.ship = savedShip;
 }
 
 // Re-implement ship drawing against a passed-in ctx (so the shop preview
