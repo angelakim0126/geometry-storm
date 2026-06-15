@@ -319,40 +319,171 @@ function makePlayer() {
   };
 }
 
+// Each ship draws as a stroked silhouette in the local frame, facing +x.
+// `r` is the visual radius — kept constant across ships so the hitbox
+// change on Phantom doesn't shrink the rendered ship.
+const SHIP_DRAW = {
+  scout(r) {
+    // Sleek fighter: pointed nose, swept-back wings, central cockpit
+    ctx.beginPath();
+    ctx.moveTo(r * 1.25, 0);
+    ctx.lineTo(r * 0.25, -r * 0.4);
+    ctx.lineTo(-r * 0.15, -r * 0.95);
+    ctx.lineTo(-r * 0.75, -r * 0.55);
+    ctx.lineTo(-r * 0.5,  -r * 0.18);
+    ctx.lineTo(-r * 0.8, 0);
+    ctx.lineTo(-r * 0.5,   r * 0.18);
+    ctx.lineTo(-r * 0.75,  r * 0.55);
+    ctx.lineTo(-r * 0.15,  r * 0.95);
+    ctx.lineTo(r * 0.25,   r * 0.4);
+    ctx.closePath();
+    ctx.stroke();
+    // Cockpit bubble
+    ctx.beginPath();
+    ctx.arc(r * 0.35, 0, r * 0.22, 0, TAU);
+    ctx.stroke();
+  },
+  striker(r) {
+    // Aggressive: long body + forward-swept wings + twin barrels
+    ctx.beginPath();
+    ctx.moveTo(r * 1.35, 0);
+    ctx.lineTo(r * 0.5, -r * 0.3);
+    ctx.lineTo(r * 0.7, -r * 0.95);
+    ctx.lineTo(-r * 0.15, -r * 0.95);
+    ctx.lineTo(-r * 0.4, -r * 0.45);
+    ctx.lineTo(-r * 0.85, -r * 0.55);
+    ctx.lineTo(-r * 0.95, 0);
+    ctx.lineTo(-r * 0.85,  r * 0.55);
+    ctx.lineTo(-r * 0.4,   r * 0.45);
+    ctx.lineTo(-r * 0.15,  r * 0.95);
+    ctx.lineTo(r * 0.7,    r * 0.95);
+    ctx.lineTo(r * 0.5,    r * 0.3);
+    ctx.closePath();
+    ctx.stroke();
+    // Twin gun barrels extending past the wings
+    ctx.beginPath();
+    ctx.moveTo(r * 0.7, -r * 0.75); ctx.lineTo(r * 1.15, -r * 0.6);
+    ctx.moveTo(r * 0.7,  r * 0.75); ctx.lineTo(r * 1.15,  r * 0.6);
+    ctx.stroke();
+  },
+  titan(r) {
+    // Bulky armored hex-front cruiser
+    ctx.beginPath();
+    ctx.moveTo(r * 1.15, 0);
+    ctx.lineTo(r * 0.85, -r * 0.55);
+    ctx.lineTo(r * 0.2, -r * 1.05);
+    ctx.lineTo(-r * 0.55, -r * 1.05);
+    ctx.lineTo(-r * 0.95, -r * 0.55);
+    ctx.lineTo(-r * 0.95,  r * 0.55);
+    ctx.lineTo(-r * 0.55,  r * 1.05);
+    ctx.lineTo(r * 0.2,   r * 1.05);
+    ctx.lineTo(r * 0.85,  r * 0.55);
+    ctx.closePath();
+    ctx.stroke();
+    // Shield ridge across the prow
+    ctx.beginPath();
+    ctx.moveTo(r * 0.55, -r * 0.55);
+    ctx.lineTo(r * 0.95, 0);
+    ctx.lineTo(r * 0.55,  r * 0.55);
+    ctx.stroke();
+    // Rear engine block lines
+    ctx.beginPath();
+    ctx.moveTo(-r * 0.95, -r * 0.3); ctx.lineTo(-r * 0.6, -r * 0.3);
+    ctx.moveTo(-r * 0.95,  r * 0.3); ctx.lineTo(-r * 0.6,  r * 0.3);
+    ctx.stroke();
+  },
+  crystal(r) {
+    // Faceted kite/diamond
+    ctx.beginPath();
+    ctx.moveTo(r * 1.35, 0);
+    ctx.lineTo(r * 0.3, -r * 0.85);
+    ctx.lineTo(-r * 0.85, -r * 0.5);
+    ctx.lineTo(-r * 0.55, 0);
+    ctx.lineTo(-r * 0.85,  r * 0.5);
+    ctx.lineTo(r * 0.3,    r * 0.85);
+    ctx.closePath();
+    ctx.stroke();
+    // Inner facet lines
+    ctx.beginPath();
+    ctx.moveTo(r * 1.35, 0); ctx.lineTo(-r * 0.55, 0);
+    ctx.moveTo(r * 0.3, -r * 0.85); ctx.lineTo(r * 0.3,  r * 0.85);
+    ctx.stroke();
+  },
+  phantom(r) {
+    // Sleek stealth — long swept wings + small canopy
+    ctx.beginPath();
+    ctx.moveTo(r * 1.5, 0);
+    ctx.lineTo(r * 0.4, -r * 0.22);
+    ctx.lineTo(r * 0.05, -r * 1.0);
+    ctx.lineTo(-r * 0.6, -r * 0.55);
+    ctx.lineTo(-r * 0.85, -r * 0.18);
+    ctx.lineTo(-r * 0.7, 0);
+    ctx.lineTo(-r * 0.85,  r * 0.18);
+    ctx.lineTo(-r * 0.6,   r * 0.55);
+    ctx.lineTo(r * 0.05,   r * 1.0);
+    ctx.lineTo(r * 0.4,    r * 0.22);
+    ctx.closePath();
+    ctx.stroke();
+    // Canopy + center fin
+    ctx.beginPath();
+    ctx.arc(r * 0.7, 0, r * 0.14, 0, TAU);
+    ctx.moveTo(r * 0.3, 0); ctx.lineTo(-r * 0.55, 0);
+    ctx.stroke();
+  },
+};
+
+// Per-ship engine attachment points (offsets from ship center in local
+// frame, behind the ship). Used to render thrust trails from the right spot.
+const SHIP_ENGINES = {
+  scout:   [{ x: -0.6, y: -0.18 }, { x: -0.6, y: 0.18 }],
+  striker: [{ x: -0.85, y: -0.35 }, { x: -0.85, y: 0.35 }],
+  titan:   [{ x: -0.9, y: -0.35 }, { x: -0.9, y: 0 }, { x: -0.9, y: 0.35 }],
+  crystal: [{ x: -0.55, y: 0 }],
+  phantom: [{ x: -0.78, y: 0 }],
+};
+
 function drawPlayer(p) {
   ctx.save();
   ctx.translate(p.x, p.y);
-
-  // Thrust trail
-  if (len(p.vx, p.vy) > 0.5) {
-    const tailA = angle(p.vx, p.vy) + Math.PI;
-    ctx.save();
-    ctx.rotate(tailA);
-    const g = ctx.createLinearGradient(0, 0, 22, 0);
-    g.addColorStop(0, 'rgba(125, 249, 255, 0.8)');
-    g.addColorStop(1, 'rgba(125, 249, 255, 0)');
-    ctx.fillStyle = g;
-    ctx.beginPath();
-    ctx.moveTo(0, -6); ctx.lineTo(22, 0); ctx.lineTo(0, 6);
-    ctx.closePath();
-    ctx.fill();
-    ctx.restore();
-  }
-
   ctx.rotate(p.angle);
+
+  const r = p.visualR || p.r;
+  const shipId = state.ship in SHIP_DRAW ? state.ship : 'scout';
   const flick = (state.t < p.invulnUntil && Math.floor(state.t / 60) % 2 === 0);
   const shipColor = p.color || '#7df9ff';
+
+  // Thrust trails — drawn in the ship's local frame so each engine
+  // pours fire straight backward, regardless of which way the ship is aimed.
+  const speed = len(p.vx, p.vy);
+  if (speed > 0.5) {
+    const engines = SHIP_ENGINES[shipId] || SHIP_ENGINES.scout;
+    // Trail length scales with speed, color matches ship
+    const trailLen = Math.min(28, 10 + speed * 3);
+    for (const eng of engines) {
+      const ex = eng.x * r;
+      const ey = eng.y * r;
+      const g = ctx.createLinearGradient(ex, ey, ex - trailLen, ey);
+      g.addColorStop(0, shipColor);
+      g.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.save();
+      ctx.globalAlpha = 0.8;
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.moveTo(ex, ey - r * 0.13);
+      ctx.lineTo(ex - trailLen, ey);
+      ctx.lineTo(ex, ey + r * 0.13);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  // Ship body
   ctx.strokeStyle = flick ? 'rgba(255, 255, 255, 0.3)' : shipColor;
   ctx.lineWidth = 2.5;
   ctx.shadowColor = shipColor;
   ctx.shadowBlur = 14;
-  ctx.beginPath();
-  ctx.moveTo(p.r, 0);
-  ctx.lineTo(-p.r * 0.7, -p.r * 0.75);
-  ctx.lineTo(-p.r * 0.4, 0);
-  ctx.lineTo(-p.r * 0.7, p.r * 0.75);
-  ctx.closePath();
-  ctx.stroke();
+  SHIP_DRAW[shipId](r);
 
   // Shield ring
   if (p.shield > 0) {
@@ -360,7 +491,7 @@ function drawPlayer(p) {
     ctx.strokeStyle = `rgba(110, 231, 183, ${0.5 + 0.3 * Math.sin(state.t / 100)})`;
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.arc(0, 0, p.r + 9, 0, TAU);
+    ctx.arc(0, 0, r + 9, 0, TAU);
     ctx.stroke();
   }
   ctx.restore();
@@ -1403,17 +1534,178 @@ function renderShop() {
         <span class="icon" style="color:${def.color}">${def.icon}</span>
         <h4>${def.name}</h4>
       </div>
+      <canvas class="ship-preview" data-ship="${id}" width="160" height="80"></canvas>
       <p class="desc">${def.desc}</p>
       ${btnHtml}
     `;
     shipWrap.appendChild(card);
   }
+  // Render each ship preview on its mini canvas
+  shipWrap.querySelectorAll('canvas.ship-preview').forEach(cv => {
+    const id = cv.dataset.ship;
+    drawShipPreview(cv, id);
+  });
   shipWrap.querySelectorAll('button[data-buy-ship]').forEach(b => {
     b.onclick = () => buyShip(b.dataset.buyShip);
   });
   shipWrap.querySelectorAll('button[data-equip]').forEach(b => {
     b.onclick = () => { setShip(b.dataset.equip); sfx.power(); renderShop(); };
   });
+}
+
+function drawShipPreview(canvas, shipId) {
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.width = 160 * dpr;
+  const h = canvas.height = 80 * dpr;
+  canvas.style.width = '160px';
+  canvas.style.height = '80px';
+  const c = canvas.getContext('2d');
+  c.setTransform(dpr, 0, 0, dpr, 0, 0);
+  c.clearRect(0, 0, 160, 80);
+
+  const ship = SHIPS[shipId] || SHIPS.scout;
+  const r = 26;
+  const cx = 80, cy = 40;
+
+  // Save the live game ctx + state.ship, swap to our mini canvas so we can
+  // reuse SHIP_DRAW (which closes over the global `ctx`).
+  const savedCtx = ctx;
+  const savedShip = state.ship;
+  // eslint-disable-next-line
+  window.ctx = c;        // SHIP_DRAW uses `ctx` from script scope — overwrite is not possible.
+  // Inline a simplified renderer using the local ctx `c`.
+  c.save();
+  c.translate(cx, cy);
+  // Slight downward tilt looks more dynamic than dead-flat
+  c.rotate(-0.06);
+  c.strokeStyle = ship.color;
+  c.shadowColor = ship.color;
+  c.shadowBlur = 14;
+  c.lineWidth = 2.5;
+
+  // Trail
+  c.save();
+  const grad = c.createLinearGradient(-r * 0.6, 0, -r * 1.8, 0);
+  grad.addColorStop(0, ship.color);
+  grad.addColorStop(1, 'rgba(0,0,0,0)');
+  c.globalAlpha = 0.7;
+  c.fillStyle = grad;
+  const eng = (SHIP_ENGINES[shipId] || SHIP_ENGINES.scout);
+  for (const e of eng) {
+    const ex = e.x * r, ey = e.y * r;
+    c.beginPath();
+    c.moveTo(ex, ey - r * 0.13);
+    c.lineTo(ex - 22, ey);
+    c.lineTo(ex, ey + r * 0.13);
+    c.closePath();
+    c.fill();
+  }
+  c.restore();
+
+  // Ship body — duplicate the SHIP_DRAW code against the local ctx
+  drawShipInto(c, shipId, r);
+
+  c.restore();
+  window.ctx = savedCtx;
+  state.ship = savedShip;
+}
+
+// Re-implement ship drawing against a passed-in ctx (so the shop preview
+// can render without touching the global game canvas).
+function drawShipInto(c, shipId, r) {
+  if (shipId === 'striker') {
+    c.beginPath();
+    c.moveTo(r * 1.35, 0);
+    c.lineTo(r * 0.5, -r * 0.3);
+    c.lineTo(r * 0.7, -r * 0.95);
+    c.lineTo(-r * 0.15, -r * 0.95);
+    c.lineTo(-r * 0.4, -r * 0.45);
+    c.lineTo(-r * 0.85, -r * 0.55);
+    c.lineTo(-r * 0.95, 0);
+    c.lineTo(-r * 0.85,  r * 0.55);
+    c.lineTo(-r * 0.4,   r * 0.45);
+    c.lineTo(-r * 0.15,  r * 0.95);
+    c.lineTo(r * 0.7,    r * 0.95);
+    c.lineTo(r * 0.5,    r * 0.3);
+    c.closePath();
+    c.stroke();
+    c.beginPath();
+    c.moveTo(r * 0.7, -r * 0.75); c.lineTo(r * 1.15, -r * 0.6);
+    c.moveTo(r * 0.7,  r * 0.75); c.lineTo(r * 1.15,  r * 0.6);
+    c.stroke();
+  } else if (shipId === 'titan') {
+    c.beginPath();
+    c.moveTo(r * 1.15, 0);
+    c.lineTo(r * 0.85, -r * 0.55);
+    c.lineTo(r * 0.2, -r * 1.05);
+    c.lineTo(-r * 0.55, -r * 1.05);
+    c.lineTo(-r * 0.95, -r * 0.55);
+    c.lineTo(-r * 0.95,  r * 0.55);
+    c.lineTo(-r * 0.55,  r * 1.05);
+    c.lineTo(r * 0.2,   r * 1.05);
+    c.lineTo(r * 0.85,  r * 0.55);
+    c.closePath();
+    c.stroke();
+    c.beginPath();
+    c.moveTo(r * 0.55, -r * 0.55);
+    c.lineTo(r * 0.95, 0);
+    c.lineTo(r * 0.55,  r * 0.55);
+    c.stroke();
+    c.beginPath();
+    c.moveTo(-r * 0.95, -r * 0.3); c.lineTo(-r * 0.6, -r * 0.3);
+    c.moveTo(-r * 0.95,  r * 0.3); c.lineTo(-r * 0.6,  r * 0.3);
+    c.stroke();
+  } else if (shipId === 'crystal') {
+    c.beginPath();
+    c.moveTo(r * 1.35, 0);
+    c.lineTo(r * 0.3, -r * 0.85);
+    c.lineTo(-r * 0.85, -r * 0.5);
+    c.lineTo(-r * 0.55, 0);
+    c.lineTo(-r * 0.85,  r * 0.5);
+    c.lineTo(r * 0.3,    r * 0.85);
+    c.closePath();
+    c.stroke();
+    c.beginPath();
+    c.moveTo(r * 1.35, 0); c.lineTo(-r * 0.55, 0);
+    c.moveTo(r * 0.3, -r * 0.85); c.lineTo(r * 0.3,  r * 0.85);
+    c.stroke();
+  } else if (shipId === 'phantom') {
+    c.beginPath();
+    c.moveTo(r * 1.5, 0);
+    c.lineTo(r * 0.4, -r * 0.22);
+    c.lineTo(r * 0.05, -r * 1.0);
+    c.lineTo(-r * 0.6, -r * 0.55);
+    c.lineTo(-r * 0.85, -r * 0.18);
+    c.lineTo(-r * 0.7, 0);
+    c.lineTo(-r * 0.85,  r * 0.18);
+    c.lineTo(-r * 0.6,   r * 0.55);
+    c.lineTo(r * 0.05,   r * 1.0);
+    c.lineTo(r * 0.4,    r * 0.22);
+    c.closePath();
+    c.stroke();
+    c.beginPath();
+    c.arc(r * 0.7, 0, r * 0.14, 0, Math.PI * 2);
+    c.moveTo(r * 0.3, 0); c.lineTo(-r * 0.55, 0);
+    c.stroke();
+  } else {
+    // scout
+    c.beginPath();
+    c.moveTo(r * 1.25, 0);
+    c.lineTo(r * 0.25, -r * 0.4);
+    c.lineTo(-r * 0.15, -r * 0.95);
+    c.lineTo(-r * 0.75, -r * 0.55);
+    c.lineTo(-r * 0.5,  -r * 0.18);
+    c.lineTo(-r * 0.8, 0);
+    c.lineTo(-r * 0.5,   r * 0.18);
+    c.lineTo(-r * 0.75,  r * 0.55);
+    c.lineTo(-r * 0.15,  r * 0.95);
+    c.lineTo(r * 0.25,   r * 0.4);
+    c.closePath();
+    c.stroke();
+    c.beginPath();
+    c.arc(r * 0.35, 0, r * 0.22, 0, Math.PI * 2);
+    c.stroke();
+  }
 }
 
 function buyUpgrade(key) {
