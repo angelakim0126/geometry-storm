@@ -75,7 +75,47 @@ const state = {
   vertexHits: 0,
   soundOn: localStorage.getItem('gs_sound') !== 'off',
   slowmo: 1,
+  coins: parseInt(localStorage.getItem('gs_coins') || '0', 10),     // persistent wallet
+  runCoins: 0,                                                       // earned this run
+  upgrades: loadUpgrades(),
+  ownedShips: loadOwnedShips(),
+  ship: localStorage.getItem('gs_ship') || 'scout',
 };
+
+// ---------- Upgrade & ship config ----------
+const UPGRADE_DEFS = {
+  fireRate: { name: 'Fire Rate', icon: '⚡', max: 5, costs: [50, 100, 200, 400, 800],   per: '−15ms per tier' },
+  hull:     { name: 'Hull',      icon: '❤',  max: 5, costs: [100, 200, 400, 800, 1600], per: '+1 starting life' },
+  speed:    { name: 'Speed',     icon: '🚀', max: 5, costs: [50, 100, 200, 400, 800],   per: '+0.4 max speed' },
+  damage:   { name: 'Damage',    icon: '💥', max: 5, costs: [100, 200, 400, 800, 1600], per: '+1 bullet damage' },
+};
+
+const SHIPS = {
+  scout:   { name: 'Scout',   icon: '🛸', cost: 0,    color: '#7df9ff', desc: 'Balanced starter.',                  mods: {} },
+  striker: { name: 'Striker', icon: '⚔️', cost: 500,  color: '#fff85d', desc: '+30% fire rate · −1 starting life.', mods: { fireMul: 0.7, livesAdd: -1 } },
+  titan:   { name: 'Titan',   icon: '🛡️', cost: 1200, color: '#6ee7b7', desc: '+2 lives · −15% speed.',             mods: { livesAdd: 2, speedMul: 0.85 } },
+  crystal: { name: 'Crystal', icon: '💎', cost: 2200, color: '#ff5dd2', desc: '+1 base damage · −20% fire rate.',   mods: { dmgAdd: 1, fireMul: 1.2 } },
+  phantom: { name: 'Phantom', icon: '🌟', cost: 3500, color: '#fa5400', desc: 'Smaller hitbox · +25% speed.',       mods: { hitboxMul: 0.7, speedMul: 1.25 } },
+};
+
+function loadUpgrades() {
+  try {
+    const raw = JSON.parse(localStorage.getItem('gs_upgrades') || '{}');
+    return { fireRate: raw.fireRate || 0, hull: raw.hull || 0, speed: raw.speed || 0, damage: raw.damage || 0 };
+  } catch (e) { return { fireRate: 0, hull: 0, speed: 0, damage: 0 }; }
+}
+function saveUpgrades() { localStorage.setItem('gs_upgrades', JSON.stringify(state.upgrades)); }
+
+function loadOwnedShips() {
+  try {
+    const raw = JSON.parse(localStorage.getItem('gs_owned_ships') || '["scout"]');
+    return Array.isArray(raw) && raw.length ? raw : ['scout'];
+  } catch (e) { return ['scout']; }
+}
+function saveOwnedShips() { localStorage.setItem('gs_owned_ships', JSON.stringify(state.ownedShips)); }
+
+function saveCoins() { localStorage.setItem('gs_coins', String(state.coins)); }
+function setShip(id) { state.ship = id; localStorage.setItem('gs_ship', id); }
 
 // ---------- Helpers ----------
 const TAU = Math.PI * 2;
@@ -247,16 +287,35 @@ function updateParticles(dt) {
 }
 
 // ---------- Player ----------
+function computeLoadout() {
+  // Combine upgrades + ship modifiers into the per-run stats the player uses.
+  const u = state.upgrades;
+  const ship = SHIPS[state.ship] || SHIPS.scout;
+  const mods = ship.mods || {};
+  const fireRate = Math.max(50, (CFG.player.fireRate - u.fireRate * 15) * (mods.fireMul ?? 1));
+  const maxSpeed = (CFG.player.maxSpeed + u.speed * 0.4) * (mods.speedMul ?? 1);
+  const lives = Math.max(1, 3 + u.hull + (mods.livesAdd ?? 0));
+  const bulletDmg = 1 + u.damage + (mods.dmgAdd ?? 0);
+  const hitboxMul = mods.hitboxMul ?? 1;
+  return { fireRate, maxSpeed, lives, bulletDmg, hitboxMul, color: ship.color };
+}
+
 function makePlayer() {
+  const lo = computeLoadout();
   return {
     x: state.w / 2, y: state.h / 2,
     vx: 0, vy: 0,
-    r: CFG.player.r,
+    r: CFG.player.r * lo.hitboxMul,
+    visualR: CFG.player.r,           // for rendering — keep ship size consistent
     angle: -Math.PI / 2,
-    lives: 3,
-    shield: 0,                // hits absorbed remaining
+    lives: lo.lives,
+    shield: 0,                       // hits absorbed remaining
     invulnUntil: 0,
     lastFire: 0,
+    fireRate: lo.fireRate,
+    maxSpeed: lo.maxSpeed,
+    bulletDmg: lo.bulletDmg,
+    color: lo.color,
   };
 }
 
@@ -282,9 +341,10 @@ function drawPlayer(p) {
 
   ctx.rotate(p.angle);
   const flick = (state.t < p.invulnUntil && Math.floor(state.t / 60) % 2 === 0);
-  ctx.strokeStyle = flick ? 'rgba(255, 255, 255, 0.3)' : '#7df9ff';
+  const shipColor = p.color || '#7df9ff';
+  ctx.strokeStyle = flick ? 'rgba(255, 255, 255, 0.3)' : shipColor;
   ctx.lineWidth = 2.5;
-  ctx.shadowColor = '#7df9ff';
+  ctx.shadowColor = shipColor;
   ctx.shadowBlur = 14;
   ctx.beginPath();
   ctx.moveTo(p.r, 0);
@@ -319,9 +379,10 @@ function updatePlayer(p, dt) {
   p.vy += my * CFG.player.accel;
   // Cap speed
   const sp = len(p.vx, p.vy);
-  if (sp > CFG.player.maxSpeed) {
-    p.vx = p.vx / sp * CFG.player.maxSpeed;
-    p.vy = p.vy / sp * CFG.player.maxSpeed;
+  const cap = p.maxSpeed || CFG.player.maxSpeed;
+  if (sp > cap) {
+    p.vx = p.vx / sp * cap;
+    p.vy = p.vy / sp * cap;
   }
   p.vx *= CFG.player.friction;
   p.vy *= CFG.player.friction;
@@ -353,8 +414,10 @@ function updatePlayer(p, dt) {
   }
   input.shooting = true;
 
-  // Fire
-  const fireDelay = (state.active && state.active.kind === 'rapid') ? 70 : CFG.player.fireRate;
+  // Fire — Rapid Fire power-up keeps a fixed fast cadence regardless of
+  // upgrades; otherwise use the player's upgraded fireRate.
+  const baseFire = p.fireRate || CFG.player.fireRate;
+  const fireDelay = (state.active && state.active.kind === 'rapid') ? Math.min(70, baseFire * 0.45) : baseFire;
   if (input.shooting && state.t - p.lastFire >= fireDelay) {
     p.lastFire = state.t;
     fireBullets(p);
@@ -374,6 +437,7 @@ function fireBullets(p) {
       vy: Math.sin(a) * CFG.bullet.speed,
       life: CFG.bullet.life,
       age: 0,
+      dmg: p.bulletDmg || 1,
     });
   }
 }
@@ -399,12 +463,13 @@ function damagePlayer(p) {
 
 // ---------- Enemies ----------
 const ENEMY_KINDS = {
-  drifter: { hp: 1, r: 14, speed: 1.0, color: '#ff5dd2', score: 10, shape: 'hex' },
-  zoomer:  { hp: 1, r: 11, speed: 2.4, color: '#fff85d', score: 20, shape: 'tri' },
-  splitter:{ hp: 2, r: 17, speed: 1.2, color: '#6ee7b7', score: 30, shape: 'sq' },
-  orbiter: { hp: 2, r: 13, speed: 1.4, color: '#7df9ff', score: 40, shape: 'circle' },
-  tank:    { hp: 4, r: 22, speed: 0.7, color: '#ff4d6d', score: 80, shape: 'octa' },
-  boss:    { hp: 50, r: 46, speed: 0.8, color: '#ff5dd2', score: 800, shape: 'star' },
+  drifter:  { hp: 1, r: 14, speed: 1.0, color: '#ff5dd2', score: 10,  coin: 1,  shape: 'hex' },
+  zoomer:   { hp: 1, r: 11, speed: 2.4, color: '#fff85d', score: 20,  coin: 2,  shape: 'tri' },
+  splitter: { hp: 2, r: 17, speed: 1.2, color: '#6ee7b7', score: 30,  coin: 3,  shape: 'sq' },
+  orbiter:  { hp: 2, r: 13, speed: 1.4, color: '#7df9ff', score: 40,  coin: 4,  shape: 'circle' },
+  tank:     { hp: 4, r: 22, speed: 0.7, color: '#ff4d6d', score: 80,  coin: 8,  shape: 'octa' },
+  shielder: { hp: 6, r: 20, speed: 0.9, color: '#a78bfa', score: 120, coin: 12, shape: 'octa' },
+  boss:     { hp: 50, r: 46, speed: 0.8, color: '#ff5dd2', score: 800, coin: 80, shape: 'star' },
 };
 
 function makeEnemy(kind, x, y, opts = {}) {
@@ -592,7 +657,15 @@ function killEnemy(e, fromPlayer = true) {
     state.score += pts;
     state.kills++;
     state.totalKills++;
+    // Coins: base from enemy, bumped by combo (capped at 3x so the wallet
+    // doesn't explode on long chains), doubled on prime waves.
+    const baseCoin = e.coin || Math.max(1, Math.floor((e.score || 10) / 10));
+    const comboMul = 1 + Math.min(2, state.combo / 5);
+    let coinReward = Math.max(1, Math.round(baseCoin * comboMul));
+    if (isPrime(state.wave)) coinReward *= 2;
+    state.runCoins += coinReward;
     addFloatText(e.x, e.y, `+${pts}`, e.color);
+    addFloatText(e.x, e.y + 14, `🪙 ${coinReward}`, '#fff85d');
 
     if (e.kind === 'boss') sfx.bigKill();
     else sfx.kill();
@@ -768,12 +841,15 @@ function startWave(n) {
   state.spawnTimer = 800;
   sfx.wave();
 
-  // Banner — milestone name wins; otherwise PRIME if it's a prime wave (>= 2)
+  // Banner — milestone name wins; otherwise mini-boss / prime / generic
   const milestoneName = MILESTONES[n];
   const prime = isPrime(n);
+  const miniBoss = (n === 8 || n === 12 || n === 16 || (n >= 22 && (n - 22) % 5 === 2));
   if (milestoneName) {
     showBanner(`WAVE ${n}${prime ? ' · PRIME' : ''}`, milestoneName);
     state.milestonesHit.push({ wave: n, name: milestoneName });
+  } else if (miniBoss) {
+    showBanner(`WAVE ${n}${prime ? ' · PRIME' : ''}`, 'MINI-BOSS · ELITE SQUAD');
   } else if (prime) {
     showBanner(`WAVE ${n}`, `PRIME · ${n} IS PRIME`);
   } else if (n === 1) {
@@ -785,13 +861,36 @@ function startWave(n) {
 
 function buildWave(n) {
   const q = [];
+  // Major boss every 5 waves
   if (n % CFG.bossEvery === 0) {
-    // Boss wave: spawn boss + a few orbiters
     q.push({ kind: 'boss', delay: 600 });
-    const minions = Math.min(4, 1 + Math.floor(n / 10));
-    for (let i = 0; i < minions; i++) q.push({ kind: 'orbiter', delay: 800 });
+    const minions = Math.min(6, 1 + Math.floor(n / 8));
+    for (let i = 0; i < minions; i++) {
+      // Higher boss waves bring tougher escorts
+      const r = Math.random();
+      const escort = n >= 20 ? (r < 0.4 ? 'shielder' : 'orbiter')
+                   : n >= 10 ? (r < 0.5 ? 'tank' : 'orbiter')
+                   : 'orbiter';
+      q.push({ kind: escort, delay: 750 });
+    }
     return q;
   }
+  // Mini-boss waves at 8, 12, 16 (not 20 — that's a major boss) — one Tank + many minions
+  const isMiniBoss = (n === 8 || n === 12 || n === 16 || (n >= 22 && (n - 22) % 5 === 2));
+  if (isMiniBoss) {
+    q.push({ kind: 'tank', delay: 500 });
+    q.push({ kind: 'shielder', delay: 700 });
+    const swarm = 6 + Math.floor(n / 4);
+    for (let i = 0; i < swarm; i++) {
+      const r = Math.random();
+      const k = r < 0.5 ? 'zoomer' : r < 0.85 ? 'splitter' : 'orbiter';
+      q.push({ kind: k, delay: rand(380, 620) });
+    }
+    return q;
+  }
+  // Spawn-delay scales down with wave so high waves feel intense.
+  const minDelay = Math.max(220, 450 - n * 12);
+  const maxDelay = Math.max(420, 850 - n * 20);
   const totalBase = 6 + n * 2;
   for (let i = 0; i < totalBase; i++) {
     let kind;
@@ -800,14 +899,19 @@ function buildWave(n) {
       kind = r < 0.7 ? 'drifter' : 'zoomer';
     } else if (n <= 4) {
       kind = r < 0.45 ? 'drifter' : r < 0.75 ? 'zoomer' : 'splitter';
-    } else if (n <= 8) {
+    } else if (n <= 6) {
       kind = r < 0.3 ? 'drifter' : r < 0.55 ? 'zoomer' : r < 0.78 ? 'splitter' : 'orbiter';
-    } else if (n <= 14) {
+    } else if (n <= 10) {
+      // Wave 7-10: tanks join the mix
       kind = r < 0.22 ? 'drifter' : r < 0.45 ? 'zoomer' : r < 0.65 ? 'splitter' : r < 0.85 ? 'orbiter' : 'tank';
+    } else if (n <= 14) {
+      // Wave 11-14: shielders appear
+      kind = r < 0.16 ? 'drifter' : r < 0.36 ? 'zoomer' : r < 0.54 ? 'splitter' : r < 0.74 ? 'orbiter' : r < 0.9 ? 'tank' : 'shielder';
     } else {
-      kind = r < 0.15 ? 'drifter' : r < 0.35 ? 'zoomer' : r < 0.55 ? 'splitter' : r < 0.78 ? 'orbiter' : 'tank';
+      // Wave 15+: heavy mix, shielders more common
+      kind = r < 0.12 ? 'drifter' : r < 0.3 ? 'zoomer' : r < 0.48 ? 'splitter' : r < 0.68 ? 'orbiter' : r < 0.85 ? 'tank' : 'shielder';
     }
-    q.push({ kind, delay: rand(450, 850) });
+    q.push({ kind, delay: rand(minDelay, maxDelay) });
   }
   return q;
 }
@@ -878,7 +982,8 @@ function updateCollisions() {
       const e = state.enemies[j];
       if (len(b.x - e.x, b.y - e.y) < e.r + CFG.bullet.r) {
         const vertex = vertexHitBonus(e, b.x, b.y);
-        const dmg = vertex ? 2 : 1;
+        const baseDmg = (b.dmg || 1);
+        const dmg = vertex ? baseDmg * 2 : baseDmg;
         e.hp -= dmg;
         if (vertex) {
           state.vertexHits++;
@@ -967,6 +1072,12 @@ function update(dt) {
   document.getElementById('score').textContent = state.score;
   document.getElementById('wave').textContent = state.wave;
   document.getElementById('combo').textContent = `x${state.combo}`;
+  updateCoinHud();
+}
+
+function updateCoinHud() {
+  const el = document.getElementById('coins-run');
+  if (el) el.textContent = state.runCoins;
 }
 
 function draw() {
@@ -1138,6 +1249,7 @@ function startGame() {
   state.slowmo = 1;
   state.milestonesHit = [];
   state.vertexHits = 0;
+  state.runCoins = 0;
   state.t = 0;
   state.shake = 0;
   state.betweenWaves = false;
@@ -1145,8 +1257,10 @@ function startGame() {
   document.getElementById('hud').classList.remove('hidden');
   document.getElementById('title').classList.add('hidden');
   document.getElementById('gameover').classList.add('hidden');
+  document.getElementById('shop').classList.add('hidden');
   buildLivesHud();
   updatePowerupHud();
+  updateCoinHud();
   startWave(1);
 }
 
@@ -1167,12 +1281,17 @@ function gameOver() {
   if (state.score > state.best) { state.best = state.score; localStorage.setItem('gs_best', String(state.best)); }
   if (state.wave > state.bestWave) { state.bestWave = state.wave; localStorage.setItem('gs_best_wave', String(state.bestWave)); }
   localStorage.setItem('gs_kills', String(state.totalKills));
+  // Bank the run's coins into the persistent wallet
+  state.coins += state.runCoins;
+  saveCoins();
 
   document.getElementById('result-score').textContent = state.score;
   document.getElementById('result-wave').textContent = state.wave;
   document.getElementById('result-combo').textContent = `x${state.bestCombo}`;
   document.getElementById('result-kills').textContent = state.kills;
   document.getElementById('result-vertex').textContent = state.vertexHits;
+  document.getElementById('result-coins').textContent = state.runCoins;
+  document.getElementById('result-coins-total').textContent = state.coins;
   document.getElementById('result-title').textContent = state.wave >= 5 ? `Reached Wave ${state.wave}` : 'Game Over';
   document.getElementById('result-emoji').textContent = state.score >= state.best && state.score > 0 ? '🏆' : '💥';
 
@@ -1194,6 +1313,7 @@ function backToTitle() {
   document.getElementById('gameover').classList.add('hidden');
   document.getElementById('pause').classList.add('hidden');
   document.getElementById('hud').classList.add('hidden');
+  document.getElementById('shop').classList.add('hidden');
   document.getElementById('title').classList.remove('hidden');
   updateTitleStats();
 }
@@ -1203,6 +1323,124 @@ function updateTitleStats() {
   document.getElementById('title-best').textContent = state.best;
   document.getElementById('title-wave').textContent = state.bestWave;
   document.getElementById('title-kills').textContent = state.totalKills;
+  document.getElementById('title-coins').textContent = state.coins;
+  // Show selected ship + level summary on the title screen
+  const ship = SHIPS[state.ship] || SHIPS.scout;
+  const u = state.upgrades;
+  const totalLevel = u.fireRate + u.hull + u.speed + u.damage;
+  document.getElementById('title-ship').textContent = `${ship.icon} ${ship.name} · Lv ${totalLevel}/20`;
+}
+
+// ---------- Shop ----------
+let shopReturn = 'title';
+function openShop(from) {
+  shopReturn = from;
+  document.getElementById('title').classList.add('hidden');
+  document.getElementById('gameover').classList.add('hidden');
+  document.getElementById('shop').classList.remove('hidden');
+  renderShop();
+}
+function closeShop() {
+  document.getElementById('shop').classList.add('hidden');
+  if (shopReturn === 'gameover') {
+    document.getElementById('gameover').classList.remove('hidden');
+  } else {
+    document.getElementById('title').classList.remove('hidden');
+    updateTitleStats();
+  }
+}
+
+function renderShop() {
+  document.getElementById('shop-wallet').textContent = state.coins;
+  // Upgrade cards
+  const upWrap = document.getElementById('shop-upgrades');
+  upWrap.innerHTML = '';
+  for (const [key, def] of Object.entries(UPGRADE_DEFS)) {
+    const lvl = state.upgrades[key];
+    const maxed = lvl >= def.max;
+    const cost = maxed ? null : def.costs[lvl];
+    const card = document.createElement('div');
+    card.className = 'shop-card' + (maxed ? ' maxed' : '');
+    const bar = Array.from({ length: def.max }, (_, i) => `<span class="${i < lvl ? 'filled' : ''}"></span>`).join('');
+    card.innerHTML = `
+      <div class="shop-card-row">
+        <span class="icon">${def.icon}</span>
+        <h4>${def.name}</h4>
+        <span class="lvl">${lvl}/${def.max}</span>
+      </div>
+      <div class="bar">${bar}</div>
+      <p class="desc">${def.per}</p>
+      <button class="shop-buy" data-up="${key}" ${maxed || state.coins < cost ? 'disabled' : ''}>
+        ${maxed ? 'MAX' : `Buy · 🪙 ${cost}`}
+      </button>
+    `;
+    upWrap.appendChild(card);
+  }
+  upWrap.querySelectorAll('button[data-up]').forEach(b => {
+    b.onclick = () => buyUpgrade(b.dataset.up);
+  });
+
+  // Ship cards
+  const shipWrap = document.getElementById('shop-ships');
+  shipWrap.innerHTML = '';
+  for (const [id, def] of Object.entries(SHIPS)) {
+    const owned = state.ownedShips.includes(id);
+    const equipped = state.ship === id;
+    const card = document.createElement('div');
+    card.className = 'shop-card' + (equipped ? ' selected' : '');
+    let btnHtml;
+    if (equipped) {
+      btnHtml = `<button class="shop-buy equipped" disabled>EQUIPPED</button>`;
+    } else if (owned) {
+      btnHtml = `<button class="shop-buy equip" data-equip="${id}">Equip</button>`;
+    } else if (state.coins >= def.cost) {
+      btnHtml = `<button class="shop-buy" data-buy-ship="${id}">Buy · 🪙 ${def.cost}</button>`;
+    } else {
+      btnHtml = `<button class="shop-buy" disabled>🪙 ${def.cost}</button>`;
+    }
+    card.innerHTML = `
+      <div class="shop-card-row">
+        <span class="icon" style="color:${def.color}">${def.icon}</span>
+        <h4>${def.name}</h4>
+      </div>
+      <p class="desc">${def.desc}</p>
+      ${btnHtml}
+    `;
+    shipWrap.appendChild(card);
+  }
+  shipWrap.querySelectorAll('button[data-buy-ship]').forEach(b => {
+    b.onclick = () => buyShip(b.dataset.buyShip);
+  });
+  shipWrap.querySelectorAll('button[data-equip]').forEach(b => {
+    b.onclick = () => { setShip(b.dataset.equip); sfx.power(); renderShop(); };
+  });
+}
+
+function buyUpgrade(key) {
+  const def = UPGRADE_DEFS[key];
+  const lvl = state.upgrades[key];
+  if (lvl >= def.max) return;
+  const cost = def.costs[lvl];
+  if (state.coins < cost) return;
+  state.coins -= cost;
+  state.upgrades[key] = lvl + 1;
+  saveCoins();
+  saveUpgrades();
+  sfx.power();
+  renderShop();
+}
+
+function buyShip(id) {
+  const def = SHIPS[id];
+  if (!def || state.ownedShips.includes(id)) return;
+  if (state.coins < def.cost) return;
+  state.coins -= def.cost;
+  state.ownedShips.push(id);
+  saveOwnedShips();
+  saveCoins();
+  setShip(id);
+  sfx.bigKill();
+  renderShop();
 }
 
 // ---------- Wire UI ----------
@@ -1237,6 +1475,9 @@ document.getElementById('quit-btn').onclick = () => {
 };
 document.getElementById('retry-btn').onclick = startGame;
 document.getElementById('title-btn').onclick = backToTitle;
+document.getElementById('shop-btn').onclick = () => openShop('title');
+document.getElementById('gameover-shop-btn').onclick = () => openShop('gameover');
+document.getElementById('shop-back').onclick = closeShop;
 document.getElementById('sound-btn').onclick = () => {
   state.soundOn = !state.soundOn;
   localStorage.setItem('gs_sound', state.soundOn ? 'on' : 'off');

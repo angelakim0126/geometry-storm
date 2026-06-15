@@ -378,6 +378,152 @@ canvas#game {
   font-weight: 700;
 }
 
+/* ---------- Title loadout chip ---------- */
+.title-loadout {
+  margin: 4px 0 18px;
+  padding: 8px 18px;
+  border-radius: 999px;
+  background: var(--panel);
+  border: 1px solid rgba(255, 248, 93, 0.35);
+  color: var(--accent-3);
+  font-weight: 700;
+  font-size: 0.92rem;
+  letter-spacing: 0.04em;
+}
+
+/* ---------- Shop ---------- */
+.shop-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  width: 100%;
+  max-width: 760px;
+  margin-bottom: 8px;
+  gap: 16px;
+}
+.shop-header h2 {
+  font-size: 1.8rem;
+  margin: 0;
+  color: var(--accent-3);
+}
+.shop-wallet {
+  color: var(--ink-soft);
+  font-size: 1rem;
+}
+.shop-wallet b {
+  color: var(--accent-3);
+  font-size: 1.25rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+}
+.shop-section-h {
+  align-self: flex-start;
+  margin: 16px 0 8px;
+  max-width: 760px;
+  width: 100%;
+  color: var(--accent);
+  font-size: 1.05rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-weight: 800;
+}
+.shop-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  width: 100%;
+  max-width: 760px;
+  margin-bottom: 8px;
+}
+.shop-grid--ships { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+
+.shop-card {
+  background: var(--panel);
+  border: 1px solid rgba(125, 249, 255, 0.18);
+  border-radius: 14px;
+  padding: 14px 14px;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.shop-card.maxed { border-color: rgba(255, 248, 93, 0.5); }
+.shop-card.selected { border-color: var(--accent-3); box-shadow: 0 0 0 1px var(--accent-3) inset, 0 0 18px rgba(255, 248, 93, 0.25); }
+.shop-card-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.shop-card h4 {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--ink);
+}
+.shop-card .icon { font-size: 1.4rem; }
+.shop-card .lvl {
+  font-size: 0.78rem;
+  color: var(--accent-3);
+  font-weight: 800;
+  letter-spacing: 0.1em;
+}
+.shop-card .desc {
+  font-size: 0.86rem;
+  color: var(--ink-soft);
+  line-height: 1.4;
+  margin: 0;
+}
+.shop-card .bar {
+  display: flex;
+  gap: 3px;
+  margin: 4px 0 2px;
+}
+.shop-card .bar span {
+  flex: 1;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(125, 249, 255, 0.15);
+}
+.shop-card .bar span.filled { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+.shop-buy {
+  appearance: none;
+  border: none;
+  background: linear-gradient(135deg, var(--accent-3), #f0a500);
+  color: #0b0d24;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-family: inherit;
+  font-weight: 800;
+  font-size: 0.85rem;
+  cursor: pointer;
+  letter-spacing: 0.04em;
+}
+.shop-buy:disabled {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.35);
+  cursor: not-allowed;
+}
+.shop-buy.equip {
+  background: linear-gradient(135deg, var(--accent), #5db8c4);
+  color: #0b0d24;
+}
+.shop-buy.equipped {
+  background: transparent;
+  color: var(--accent-3);
+  border: 1px solid var(--accent-3);
+  cursor: default;
+}
+
+/* HUD coin block highlight */
+.hud-block--coin { border-color: rgba(255, 248, 93, 0.4); }
+.hud-block--coin .hud-value { color: var(--accent-3); }
+
+@media (max-width: 600px) {
+  .shop-header h2 { font-size: 1.4rem; }
+  .shop-section-h { font-size: 0.85rem; }
+  .shop-card { padding: 12px; }
+}
+
 /* ---------- Workshop link ---------- */
 #workshop-link {
   position: fixed;

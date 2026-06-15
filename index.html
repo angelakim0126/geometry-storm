@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <meta name="theme-color" content="#05060f" />
   <title>Geometry Storm</title>
-  <link rel="stylesheet" href="styles.css?v=20260614i" />
+  <link rel="stylesheet" href="styles.css?v=20260615a" />
 </head>
 <body>
   <a href="https://angelakim0126.github.io/gaminghub/" aria-label="Back to Angela's Game Hub" id="workshop-link">← Game Hub</a>
@@ -25,6 +25,10 @@
       <div class="hud-block">
         <div class="hud-label">BEST</div>
         <div class="hud-value" id="best">0</div>
+      </div>
+      <div class="hud-block hud-block--coin">
+        <div class="hud-label">🪙 RUN</div>
+        <div class="hud-value" id="coins-run">0</div>
       </div>
     </div>
     <div class="hud-row hud-mid">
@@ -72,9 +76,13 @@
       <div><span class="stat-k">High Score</span><span class="stat-v" id="title-best">0</span></div>
       <div><span class="stat-k">Best Wave</span><span class="stat-v" id="title-wave">0</span></div>
       <div><span class="stat-k">Total Kills</span><span class="stat-v" id="title-kills">0</span></div>
+      <div><span class="stat-k">🪙 Coins</span><span class="stat-v" id="title-coins">0</span></div>
     </div>
 
+    <div class="title-loadout"><span id="title-ship">🛸 Scout · Lv 0/20</span></div>
+
     <button class="btn btn-primary" id="start-btn">START</button>
+    <button class="btn btn-ghost" id="shop-btn">🪙 Shop</button>
     <button class="btn btn-ghost" id="how-btn">How to Play</button>
 
     <div class="footer-tag">A personal project · Made by Mom for George</div>
@@ -147,15 +155,34 @@
       <div><span class="stat-k">Best Combo</span><span class="stat-v" id="result-combo">x1</span></div>
       <div><span class="stat-k">Kills</span><span class="stat-v" id="result-kills">0</span></div>
       <div><span class="stat-k">✦ Vertex Hits</span><span class="stat-v" id="result-vertex">0</span></div>
+      <div><span class="stat-k">🪙 Earned</span><span class="stat-v" id="result-coins">0</span></div>
+      <div><span class="stat-k">🪙 Wallet</span><span class="stat-v" id="result-coins-total">0</span></div>
     </div>
     <div class="milestone-list" id="milestone-list"></div>
     <button class="btn btn-primary" id="retry-btn">Try Again</button>
+    <button class="btn btn-ghost" id="gameover-shop-btn">🪙 Shop</button>
     <button class="btn btn-ghost" id="title-btn">Title Screen</button>
+  </div>
+
+  <!-- Shop overlay -->
+  <div id="shop" class="screen hidden">
+    <div class="shop-header">
+      <h2>🪙 Shop</h2>
+      <div class="shop-wallet">Wallet: <b id="shop-wallet">0</b> coins</div>
+    </div>
+
+    <h3 class="shop-section-h">Pilot Upgrades</h3>
+    <div class="shop-grid" id="shop-upgrades"></div>
+
+    <h3 class="shop-section-h">Ships</h3>
+    <div class="shop-grid shop-grid--ships" id="shop-ships"></div>
+
+    <button class="btn btn-primary" id="shop-back">Back</button>
   </div>
 
   <!-- Sound toggle -->
   <button id="sound-btn" class="icon-btn" title="Mute (M)">🔊</button>
 
-  <script src="app.js?v=20260614h"></script>
+  <script src="app.js?v=20260615a"></script>
 </body>
 </html>
