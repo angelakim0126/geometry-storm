@@ -473,6 +473,14 @@ canvas#game {
   line-height: 1.4;
   margin: 0;
 }
+.ship-preview {
+  display: block;
+  width: 160px;
+  height: 80px;
+  margin: 4px auto 2px;
+  background: radial-gradient(ellipse at center, rgba(125, 249, 255, 0.06) 0%, rgba(0,0,0,0) 70%);
+  border-radius: 8px;
+}
 .shop-card .bar {
   display: flex;
   gap: 3px;
