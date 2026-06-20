@@ -402,11 +402,15 @@ function computeLoadout() {
   const u = state.upgrades;
   const ship = SHIPS[state.ship] || SHIPS.scout;
   const mods = ship.mods || {};
-  const fireRate = Math.max(50, (CFG.player.fireRate - u.fireRate * 15) * (mods.fireMul ?? 1));
-  const maxSpeed = (CFG.player.maxSpeed + u.speed * 0.4) * (mods.speedMul ?? 1);
-  const lives = Math.max(1, 3 + u.hull + (mods.livesAdd ?? 0));
-  const bulletDmg = 1 + u.damage + (mods.dmgAdd ?? 0);
-  const hitboxMul = mods.hitboxMul ?? 1;
+  // Defensive: avoid `??` so older iOS Safari (< 13.4) can still parse this
+  // file.  If parsing fails, the whole script dies and the START button
+  // never binds — exactly the symptom we keep hitting on iPads.
+  const def = (v, d) => (v === undefined || v === null) ? d : v;
+  const fireRate = Math.max(50, (CFG.player.fireRate - u.fireRate * 15) * def(mods.fireMul, 1));
+  const maxSpeed = (CFG.player.maxSpeed + u.speed * 0.4) * def(mods.speedMul, 1);
+  const lives = Math.max(1, 3 + u.hull + def(mods.livesAdd, 0));
+  const bulletDmg = 1 + u.damage + def(mods.dmgAdd, 0);
+  const hitboxMul = def(mods.hitboxMul, 1);
   return {
     fireRate, maxSpeed, lives, bulletDmg, hitboxMul,
     color: ship.color,
@@ -2107,30 +2111,48 @@ function buyShip(id) {
 document.querySelectorAll('.grade-pill').forEach(p => {
   p.onclick = () => { setMathGrade(p.dataset.grade); updateTitleStats(); };
 });
-document.getElementById('math-submit').onclick = submitMathAnswer;
+bindActivation(document.getElementById('math-submit'), submitMathAnswer);
 document.getElementById('math-input').addEventListener('keydown', e => {
   if (e.key === 'Enter') { e.preventDefault(); submitMathAnswer(); }
 });
-document.getElementById('enemies-btn').onclick = () => {
+bindActivation(document.getElementById('enemies-btn'), () => {
   document.getElementById('title').classList.add('hidden');
   document.getElementById('enemies').classList.remove('hidden');
   renderEnemyGuide();
-};
+});
 document.getElementById('enemies-back').onclick = () => {
   document.getElementById('enemies').classList.add('hidden');
   document.getElementById('title').classList.remove('hidden');
 };
 
-document.getElementById('start-btn').onclick = () => {
-  try { audio(); } catch (e) { /* mobile may block AudioContext — keep going, sfx is non-critical */ }
+// iOS Safari sometimes drops the synthesized `click` from a tap on the
+// very first interaction (especially when AudioContext + touch-action
+// combine).  Bind both `click` AND `touchend` for the critical screen
+// transitions, with a small dedupe window so each tap fires once.
+function bindActivation(el, handler) {
+  if (!el) return;
+  let lastT = 0;
+  const wrapped = (e) => {
+    const now = (e && e.timeStamp) ? e.timeStamp : Date.now();
+    if (now - lastT < 450) return;
+    lastT = now;
+    if (e && e.type === 'touchend' && e.cancelable) e.preventDefault();
+    try { handler(e); } catch (err) { /* swallow — game must not stay stuck */ console && console.error && console.error(err); }
+  };
+  el.addEventListener('click', wrapped, { passive: false });
+  el.addEventListener('touchend', wrapped, { passive: false });
+}
+
+bindActivation(document.getElementById('start-btn'), () => {
+  try { audio(); } catch (e) { /* iOS AudioContext may need a real user gesture later */ }
   startGame();
-};
-document.getElementById('how-btn').onclick = () => {
+});
+bindActivation(document.getElementById('how-btn'), () => {
   document.getElementById('title').classList.add('hidden');
   document.getElementById('how').classList.remove('hidden');
   document.getElementById('how-back').classList.remove('hidden');
   document.getElementById('how-back-pause').classList.add('hidden');
-};
+});
 document.getElementById('how-back').onclick = () => {
   document.getElementById('how').classList.add('hidden');
   document.getElementById('title').classList.remove('hidden');
@@ -2152,7 +2174,7 @@ document.getElementById('quit-btn').onclick = () => {
 };
 document.getElementById('retry-btn').onclick = startGame;
 document.getElementById('title-btn').onclick = backToTitle;
-document.getElementById('shop-btn').onclick = () => openShop('title');
+bindActivation(document.getElementById('shop-btn'), () => openShop('title'));
 document.getElementById('gameover-shop-btn').onclick = () => openShop('gameover');
 document.getElementById('shop-back').onclick = closeShop;
 document.getElementById('sound-btn').onclick = () => {
