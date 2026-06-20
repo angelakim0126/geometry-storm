@@ -42,9 +42,11 @@ canvas#game {
   width: 100%;
   height: 100%;
   display: block;
-  /* Block default browser gestures on the canvas itself — this is the
-     surface where joysticks live during gameplay. */
-  touch-action: none;
+  /* IMPORTANT: do NOT set touch-action on the canvas.  iPad Safari has a
+     known quirk where a full-screen canvas with touch-action:none can
+     silently absorb taps from elements layered above it via z-index.
+     Joystick zones (.stick-zone) opt into touch-action:none individually
+     where it actually matters; the canvas itself does not need it. */
 }
 
 .hidden { display: none !important; }
