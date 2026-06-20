@@ -29,6 +29,109 @@ function isPrime(n) {
   return true;
 }
 
+// ---------- Math problem generators (grade-banded) ----------
+// Each generator returns { prompt: string, answer: number, hint?: string }.
+// Answers are always exact numbers; checks are integer-equal or |delta| < 1e-3.
+const MATH_GENS = {
+  '7': [
+    () => { const a = randi(-12, 12), b = randi(-12, 12); return { prompt: `${a} × ${b} = ?`, answer: a * b }; },
+    () => { const a = randi(2, 9), b = randi(2, 12); return { prompt: `${a * b} ÷ ${a} = ?`, answer: b }; },
+    () => { const a = randi(2, 9), b = randi(1, 20), c = a * randi(2, 12) + b; return { prompt: `Solve for x:  ${a}x + ${b} = ${c}`, answer: (c - b) / a }; },
+    () => { const p = randi(1, 9) * 5, of = randi(2, 20) * 10; return { prompt: `${p}% of ${of} = ?`, answer: p * of / 100 }; },
+    () => { const a = randi(2, 9), b = randi(2, 9); return { prompt: `(-${a}) × ${b} = ?`, answer: -a * b }; },
+    () => { const a = randi(4, 9), b = randi(2, 6); return { prompt: `${a}² − ${b}² = ?`, answer: a * a - b * b }; },
+    () => { const a = randi(2, 9), b = randi(2, 9); return { prompt: `4 + ${a} × (${b + 2} − ${b}) = ?`, answer: 4 + a * 2 }; },
+  ],
+  '8': [
+    () => { const a = randi(2, 5), b = randi(2, 6); return { prompt: `${a}^${b} = ?`, answer: Math.pow(a, b) }; },
+    () => { const r = randi(2, 20); return { prompt: `√${r * r} = ?`, answer: r }; },
+    () => { const a = randi(2, 6), b = randi(2, 9), c = a * (randi(3, 9) + b) - a * b; const x = c / a + 0; return { prompt: `Solve for x:  ${a}(x + ${b}) = ${c + a * b}`, answer: c / a }; },
+    () => { const a = randi(3, 8), b = randi(3, 12); return { prompt: `Pythagorean: a=${a}, b=${b}. Find c² (= a² + b²)`, answer: a * a + b * b }; },
+    () => { const a = randi(3, 9), b = randi(2, 9); return { prompt: `${a * b} ÷ ${a} + ${b} = ?`, answer: b + b }; },
+    () => { const a = randi(2, 9); return { prompt: `(-${a})³ = ?`, answer: -a * a * a }; },
+    () => { const a = randi(1, 9), p = randi(2, 4); return { prompt: `${a}.0 × 10^${p} = ?`, answer: a * Math.pow(10, p) }; },
+  ],
+  '9': [
+    () => { const r1 = randi(1, 8), r2 = randi(1, 8); return { prompt: `Factor x² + ${r1 + r2}x + ${r1 * r2}. Larger root r in x² + bx + c = (x+r1)(x+r2)?`, answer: Math.max(r1, r2), hint: `(x + a)(x + b) form` }; },
+    () => { const x1 = randi(-5, 5), y1 = randi(-5, 5), m = randi(2, 5), x2 = x1 + randi(1, 4); const y2 = y1 + m * (x2 - x1); return { prompt: `Line through (${x1}, ${y1}) and (${x2}, ${y2}). Slope = ?`, answer: m }; },
+    () => { const a = randi(2, 6), b = randi(-9, 9), x = randi(-6, 6); return { prompt: `f(x) = ${a}x ${b >= 0 ? '+ ' + b : '− ' + (-b)}.  f(${x}) = ?`, answer: a * x + b }; },
+    () => { const x = randi(1, 8), y = randi(1, 8); return { prompt: `Solve: x + y = ${x + y}, x − y = ${x - y}.  x = ?`, answer: x }; },
+    () => { const a = randi(3, 8), b = randi(3, 9); return { prompt: `Distance from (0,0) to (${a}, ${b}). (Round to 2 decimals.)`, answer: Math.round(Math.sqrt(a * a + b * b) * 100) / 100 }; },
+    () => { const a = randi(2, 6), b = randi(2, 6); return { prompt: `(${a}x + ${b}) − (${a - 1}x + ${b - 1}) simplifies to x + ?`, answer: 1 }; },
+  ],
+  '10': [
+    () => { const r1 = randi(1, 6), r2 = randi(1, 6); return { prompt: `Roots of x² − ${r1 + r2}x + ${r1 * r2} = 0. Larger root = ?`, answer: Math.max(r1, r2) }; },
+    () => { const choices = [{ a: 30, v: 0.5 }, { a: 60, v: Math.round(Math.sqrt(3) / 2 * 1000) / 1000 }, { a: 45, v: Math.round(Math.sqrt(2) / 2 * 1000) / 1000 }, { a: 90, v: 1 }, { a: 0, v: 0 }]; const c = choices[randi(0, choices.length - 1)]; return { prompt: `sin(${c.a}°) = ?  (3 decimals)`, answer: c.v }; },
+    () => { const b = [2, 3, 4, 5][randi(0, 3)], p = randi(2, 5); return { prompt: `log_${b}(${Math.pow(b, p)}) = ?`, answer: p }; },
+    () => { const r = randi(2, 12); return { prompt: `Area of circle with radius ${r}, in terms of π. (Just the coefficient.) ${r}² = ?`, answer: r * r }; },
+    () => { const a = randi(2, 6), b = randi(2, 6); return { prompt: `(x + ${a})(x − ${b}) = x² + cx + d. c = ?`, answer: a - b }; },
+    () => { const n = randi(3, 8); return { prompt: `Sum of interior angles of a ${n}-gon (degrees) = (n−2)·180 = ?`, answer: (n - 2) * 180 }; },
+  ],
+};
+
+function nextMathProblem() {
+  const grade = state.mathGrade || '7';
+  const pool = MATH_GENS[grade] || MATH_GENS['7'];
+  return pool[randi(0, pool.length - 1)]();
+}
+
+function setMathGrade(g) {
+  state.mathGrade = g;
+  localStorage.setItem('gs_math_grade', g);
+}
+
+function openMathGate() {
+  state.mathPending = nextMathProblem();
+  // Pause the game while the gate is up — update() bails out on this mode
+  state.mode = 'math';
+  const m = document.getElementById('math-gate');
+  document.getElementById('math-grade').textContent = `Grade ${state.mathGrade}`;
+  document.getElementById('math-prompt').textContent = state.mathPending.prompt;
+  const fb = document.getElementById('math-feedback');
+  fb.textContent = '';
+  fb.className = 'math-feedback';
+  const inp = document.getElementById('math-input');
+  inp.value = '';
+  m.classList.remove('hidden');
+  // Focus input after the screen transitions in
+  setTimeout(() => inp.focus(), 100);
+}
+
+function submitMathAnswer() {
+  if (!state.mathPending || state.mode !== 'math') return;
+  const inp = document.getElementById('math-input');
+  const raw = (inp.value || '').trim();
+  if (raw === '') return;
+  const v = parseFloat(raw);
+  const correct = state.mathPending.answer;
+  const close = !isNaN(v) && Math.abs(v - correct) < 1e-3;
+  const fb = document.getElementById('math-feedback');
+  if (close) {
+    state.mathSolved++;
+    state.runCoins += 150;
+    state.score += 100;
+    fb.textContent = `✓ Correct! +150 🪙 +100 score`;
+    fb.className = 'math-feedback good';
+    sfx.power();
+    setTimeout(() => closeMathGate(true), 700);
+  } else {
+    fb.textContent = `✗ Not quite — answer was ${correct}. Next wave still loading…`;
+    fb.className = 'math-feedback bad';
+    sfx.wrong && sfx.wrong();
+    setTimeout(() => closeMathGate(false), 1400);
+  }
+}
+
+function closeMathGate(/* solved */) {
+  state.mathPending = null;
+  document.getElementById('math-gate').classList.add('hidden');
+  state.betweenWaves = false;
+  state.mode = 'playing';
+  const w = state.mathNextWave || (state.wave + 1);
+  state.mathNextWave = 0;
+  startWave(w);
+}
+
 // Vertex-side count per enemy shape (used for the "weak point" bonus).
 // Orbiter is a circle — no vertices, no bonus.
 const SHAPE_SIDES = { tri: 3, sq: 4, hex: 6, octa: 8, star: 10 };
@@ -80,6 +183,10 @@ const state = {
   upgrades: loadUpgrades(),
   ownedShips: loadOwnedShips(),
   ship: localStorage.getItem('gs_ship') || 'scout',
+  mathGrade: localStorage.getItem('gs_math_grade') || '7',
+  mathPending: null,        // { prompt, answer, hint } while modal is up
+  mathNextWave: 0,          // wave to start after solving
+  mathSolved: 0,            // per-run count
 };
 
 // ---------- Upgrade & ship config ----------
@@ -674,16 +781,25 @@ const ENEMY_KINDS = {
   orbiter:  { hp: 2, r: 13, speed: 1.4, color: '#7df9ff', score: 40,  coin: 4,  shape: 'circle' },
   tank:     { hp: 4, r: 22, speed: 0.7, color: '#ff4d6d', score: 80,  coin: 8,  shape: 'octa' },
   shielder: { hp: 6, r: 20, speed: 0.9, color: '#a78bfa', score: 120, coin: 12, shape: 'octa' },
-  boss:     { hp: 50, r: 46, speed: 0.8, color: '#ff5dd2', score: 800, coin: 80, shape: 'star' },
+  boss:     { hp: 180, r: 46, speed: 0.85, color: '#ff5dd2', score: 800, coin: 120, shape: 'star' },
 };
+
+// Per-wave HP scaling: enemies past wave 5 get tougher individually, so
+// the late-game is "stronger, not more". Bosses scale faster.
+function enemyHpScale(kind, wave) {
+  if (kind === 'boss') return 1 + Math.max(0, wave - 5) * 0.45;
+  return 1 + Math.max(0, wave - 5) * 0.18;
+}
 
 function makeEnemy(kind, x, y, opts = {}) {
   const k = ENEMY_KINDS[kind];
+  const scale = (opts.hp ? 1 : enemyHpScale(kind, state.wave));
+  const hp = Math.ceil((opts.hp || k.hp) * scale);
   return {
     kind, x, y, vx: 0, vy: 0,
     r: opts.r || k.r,
-    hp: opts.hp || k.hp,
-    maxHp: opts.hp || k.hp,
+    hp,
+    maxHp: hp,
     speed: opts.speed || k.speed,
     color: k.color,
     shape: k.shape,
@@ -747,14 +863,18 @@ function updateEnemy(e, dt) {
     e.vy += (target.y - e.y) * 0.0015;
     e.vx *= 0.97; e.vy *= 0.97;
     if (state.t > e.fireT) {
-      e.fireT = state.t + 900;
+      // Boss fires faster the higher the wave — 900ms at wave 5, down to
+      // about 500ms by wave 25. Late bosses are meant to punish.
+      const cool = Math.max(450, 900 - state.wave * 18);
+      e.fireT = state.t + cool;
       bossBarrage(e);
     }
   }
 
   const slowMul = (e.slowUntil && state.t < e.slowUntil) ? 0.4 : 1;
-  e.x += e.vx * state.slowmo * slowMul;
-  e.y += e.vy * state.slowmo * slowMul;
+  const tailMul = state.tailMul || 1;
+  e.x += e.vx * state.slowmo * slowMul * tailMul;
+  e.y += e.vy * state.slowmo * slowMul * tailMul;
 }
 
 function enemyShoot(e) {
@@ -770,7 +890,8 @@ function enemyShoot(e) {
 }
 
 function bossBarrage(boss) {
-  const N = 12;
+  // More bullets per barrage on higher waves so bosses feel meaner.
+  const N = Math.min(24, 12 + Math.floor(state.wave / 3));
   const base = state.t / 400;
   for (let i = 0; i < N; i++) {
     const a = base + (i / N) * TAU;
@@ -864,11 +985,10 @@ function killEnemy(e, fromPlayer = true) {
     state.kills++;
     state.totalKills++;
     // Coins: base from enemy, bumped by combo (capped at 3x so the wallet
-    // doesn't explode on long chains), doubled on prime waves.
+    // doesn't explode on long chains).
     const baseCoin = e.coin || Math.max(1, Math.floor((e.score || 10) / 10));
     const comboMul = 1 + Math.min(2, state.combo / 5);
-    let coinReward = Math.max(1, Math.round(baseCoin * comboMul));
-    if (isPrime(state.wave)) coinReward *= 2;
+    const coinReward = Math.max(1, Math.round(baseCoin * comboMul));
     state.runCoins += coinReward;
     addFloatText(e.x, e.y, `+${pts}`, e.color);
     addFloatText(e.x, e.y + 14, `🪙 ${coinReward}`, '#fff85d');
@@ -876,9 +996,8 @@ function killEnemy(e, fromPlayer = true) {
     if (e.kind === 'boss') sfx.bigKill();
     else sfx.kill();
 
-    // Maybe drop power-up (doubled on prime waves)
-    const dropChance = isPrime(state.wave) ? CFG.powerupDrop * 2 : CFG.powerupDrop;
-    if (Math.random() < dropChance || e.kind === 'boss') {
+    // Maybe drop power-up
+    if (Math.random() < CFG.powerupDrop || e.kind === 'boss') {
       spawnPowerup(e.x, e.y);
     }
   }
@@ -1047,17 +1166,14 @@ function startWave(n) {
   state.spawnTimer = 800;
   sfx.wave();
 
-  // Banner — milestone name wins; otherwise mini-boss / prime / generic
+  // Banner — milestone name wins; otherwise mini-boss / generic
   const milestoneName = MILESTONES[n];
-  const prime = isPrime(n);
   const miniBoss = (n === 8 || n === 12 || n === 16 || (n >= 22 && (n - 22) % 5 === 2));
   if (milestoneName) {
-    showBanner(`WAVE ${n}${prime ? ' · PRIME' : ''}`, milestoneName);
+    showBanner(`WAVE ${n}`, milestoneName);
     state.milestonesHit.push({ wave: n, name: milestoneName });
   } else if (miniBoss) {
-    showBanner(`WAVE ${n}${prime ? ' · PRIME' : ''}`, 'MINI-BOSS · ELITE SQUAD');
-  } else if (prime) {
-    showBanner(`WAVE ${n}`, `PRIME · ${n} IS PRIME`);
+    showBanner(`WAVE ${n}`, 'MINI-BOSS · ELITE SQUAD');
   } else if (n === 1) {
     showBanner(`WAVE ${n}`, 'INCOMING');
   } else {
@@ -1097,7 +1213,9 @@ function buildWave(n) {
   // Spawn-delay scales down with wave so high waves feel intense.
   const minDelay = Math.max(220, 450 - n * 12);
   const maxDelay = Math.max(420, 850 - n * 20);
-  const totalBase = 6 + n * 2;
+  // Fewer enemies than before, but the HP scaling in makeEnemy makes
+  // each one tougher — net effect is "stronger, not more".
+  const totalBase = 5 + Math.floor(n * 1.1);
   for (let i = 0; i < totalBase; i++) {
     let kind;
     const r = Math.random();
@@ -1144,23 +1262,14 @@ function updateWave(dt) {
     }
   }
   if (state.spawnQueue.length === 0 && state.enemies.length === 0 && !state.betweenWaves) {
-    // Wave clear — gap before next wave starts. Triangular-number bonus
-    // (Σ from 1..N times 10), doubled on prime waves.
+    // Wave clear — open the math gate. Next wave only starts after the
+    // player solves (or skips) a grade-appropriate math problem.
     state.betweenWaves = true;
     const N = state.wave;
-    let bonus = N * (N + 1) * 5;       // = 10 * Σ(1..N)
-    const prime = isPrime(N);
-    if (prime) bonus *= 2;
-    state.score += bonus;
-    const label = prime
-      ? `Σ(1..${N})·10 ×2 PRIME = ${bonus}`
-      : `Σ(1..${N})·10 = ${bonus}`;
-    addFloatText(state.w / 2, state.h / 2, label, prime ? '#ff5dd2' : '#fff85d');
-    const nextWave = N + 1;
-    setTimeout(() => {
-      state.betweenWaves = false;
-      if (state.mode === 'playing') startWave(nextWave);
-    }, 1300);
+    state.score += 25;                          // tiny flat clear bonus
+    addFloatText(state.w / 2, state.h / 2 - 20, `WAVE ${N} CLEAR`, '#fff85d');
+    state.mathNextWave = N + 1;
+    setTimeout(() => { if (state.mode !== 'gameover') openMathGate(); }, 900);
   }
 }
 
@@ -1268,6 +1377,16 @@ function shake(amt) { state.shake = Math.min(CFG.shake.max, state.shake + amt); 
 function update(dt) {
   if (state.mode !== 'playing') return;
   state.t += dt;
+  // Wave-tail acceleration: when the spawn queue is empty and enemies
+  // remain on screen, push them toward the player so the wave can finish
+  // without bombing. The speedup ramps from 1× → 2.2× over 8 seconds.
+  if (state.spawnQueue.length === 0 && state.enemies.length > 0 && !state.betweenWaves) {
+    state.tailT = (state.tailT || 0) + dt;
+    state.tailMul = 1 + clamp(state.tailT / 8000, 0, 1) * 1.2;
+  } else {
+    state.tailT = 0;
+    state.tailMul = 1;
+  }
 
   updatePlayer(state.player, dt);
 
@@ -1493,6 +1612,11 @@ function startGame() {
   state.milestonesHit = [];
   state.vertexHits = 0;
   state.runCoins = 0;
+  state.mathSolved = 0;
+  state.mathPending = null;
+  state.mathNextWave = 0;
+  state.tailT = 0;
+  state.tailMul = 1;
   state.t = 0;
   state.shake = 0;
   state.betweenWaves = false;
@@ -1501,6 +1625,8 @@ function startGame() {
   document.getElementById('title').classList.add('hidden');
   document.getElementById('gameover').classList.add('hidden');
   document.getElementById('shop').classList.add('hidden');
+  document.getElementById('math-gate').classList.add('hidden');
+  document.getElementById('enemies').classList.add('hidden');
   buildLivesHud();
   updatePowerupHud();
   updateCoinHud();
@@ -1553,10 +1679,13 @@ function gameOver() {
 
 function backToTitle() {
   state.mode = 'title';
+  state.mathPending = null;
   document.getElementById('gameover').classList.add('hidden');
   document.getElementById('pause').classList.add('hidden');
   document.getElementById('hud').classList.add('hidden');
   document.getElementById('shop').classList.add('hidden');
+  document.getElementById('math-gate').classList.add('hidden');
+  document.getElementById('enemies').classList.add('hidden');
   document.getElementById('title').classList.remove('hidden');
   updateTitleStats();
 }
@@ -1572,6 +1701,10 @@ function updateTitleStats() {
   const u = state.upgrades;
   const totalLevel = u.fireRate + u.hull + u.speed + u.damage;
   document.getElementById('title-ship').textContent = `${ship.icon} ${ship.name} · Lv ${totalLevel}/20`;
+  // Sync grade-pill active state
+  document.querySelectorAll('.grade-pill').forEach(p => {
+    p.classList.toggle('active', p.dataset.grade === state.mathGrade);
+  });
 }
 
 // ---------- Shop ----------
@@ -1663,6 +1796,93 @@ function renderShop() {
   shipWrap.querySelectorAll('button[data-equip]').forEach(b => {
     b.onclick = () => { setShip(b.dataset.equip); sfx.power(); renderShop(); };
   });
+}
+
+// Enemy guide — list every enemy kind with a tiny preview and the
+// wave they start showing up. Mirrors what buildWave actually does.
+const ENEMY_GUIDE = [
+  { kind: 'drifter',  name: 'Drifter',  when: 'Wave 1+',  desc: 'Slow pink chaser. 1 HP. The easiest enemy.' },
+  { kind: 'zoomer',   name: 'Zoomer',   when: 'Wave 1+',  desc: 'Fast yellow triangle that commits to a direct dash. 1 HP.' },
+  { kind: 'splitter', name: 'Splitter', when: 'Wave 3+',  desc: 'Green square. 2 HP. Splits into two small drifters when killed.' },
+  { kind: 'orbiter',  name: 'Orbiter',  when: 'Wave 5+',  desc: 'Cyan circle that orbits you at distance and shoots at you. 2 HP.' },
+  { kind: 'tank',     name: 'Tank',     when: 'Wave 7+',  desc: 'Slow red octagon. 4 HP. Brings everyone else to a halt if you ignore it.' },
+  { kind: 'shielder', name: 'Shielder', when: 'Wave 11+', desc: 'Purple octagon. 6 HP. Slower than tank but tougher.' },
+  { kind: 'boss',     name: 'Boss',     when: 'Wave 5, 10, 15, 20…', desc: 'Big star. Heaps of HP, radial barrages, escorts. Faster fire on higher waves.' },
+];
+
+function renderEnemyGuide() {
+  const wrap = document.getElementById('enemy-grid');
+  wrap.innerHTML = '';
+  for (const row of ENEMY_GUIDE) {
+    const card = document.createElement('div');
+    card.className = 'enemy-card';
+    card.innerHTML = `
+      <canvas data-kind="${row.kind}"></canvas>
+      <div class="name">${row.name}</div>
+      <div class="when">${row.when}</div>
+      <div class="desc">${row.desc}</div>`;
+    wrap.appendChild(card);
+  }
+  // Mini-boss card (composite — not a single kind)
+  const mb = document.createElement('div');
+  mb.className = 'enemy-card';
+  mb.innerHTML = `
+    <canvas data-kind="tank"></canvas>
+    <div class="name">Mini-Boss Wave</div>
+    <div class="when">Wave 8, 12, 16…</div>
+    <div class="desc">Not a single enemy — a Tank + Shielder + a fast swarm spawn together. Bring power-ups.</div>`;
+  wrap.appendChild(mb);
+
+  // Render each tiny preview
+  wrap.querySelectorAll('canvas[data-kind]').forEach(cv => {
+    drawEnemyPreview(cv, cv.dataset.kind);
+  });
+}
+
+function drawEnemyPreview(canvas, kind) {
+  const k = ENEMY_KINDS[kind];
+  if (!k) return;
+  const dpr = window.devicePixelRatio || 1;
+  const w = 200, h = 70;
+  canvas.width = w * dpr;
+  canvas.height = h * dpr;
+  canvas.style.width = w + 'px';
+  canvas.style.height = h + 'px';
+  const c = canvas.getContext('2d');
+  c.setTransform(dpr, 0, 0, dpr, 0, 0);
+  c.clearRect(0, 0, w, h);
+  c.save();
+  c.translate(w / 2, h / 2);
+  c.rotate(0.4);    // tilted for visual interest
+  c.strokeStyle = k.color;
+  c.shadowColor = k.color;
+  c.shadowBlur = 14;
+  c.lineWidth = 2.2;
+  const r = (kind === 'boss') ? 22 : (kind === 'tank' || kind === 'shielder') ? 19 : 17;
+  if (k.shape === 'circle') {
+    c.beginPath(); c.arc(0, 0, r, 0, TAU); c.stroke();
+    c.beginPath(); c.arc(0, 0, r * 0.55, 0, TAU); c.stroke();
+  } else if (k.shape === 'star') {
+    const points = 5;
+    c.beginPath();
+    for (let i = 0; i <= points * 2; i++) {
+      const a = (i / (points * 2)) * TAU - Math.PI / 2;
+      const rr = (i % 2 === 0) ? r : r * 0.5;
+      const x = Math.cos(a) * rr, y = Math.sin(a) * rr;
+      if (i === 0) c.moveTo(x, y); else c.lineTo(x, y);
+    }
+    c.stroke();
+  } else {
+    const sides = k.shape === 'tri' ? 3 : k.shape === 'sq' ? 4 : k.shape === 'hex' ? 6 : 8;
+    c.beginPath();
+    for (let i = 0; i <= sides; i++) {
+      const a = (i / sides) * TAU - Math.PI / 2;
+      const x = Math.cos(a) * r, y = Math.sin(a) * r;
+      if (i === 0) c.moveTo(x, y); else c.lineTo(x, y);
+    }
+    c.stroke();
+  }
+  c.restore();
 }
 
 function drawShipPreview(canvas, shipId) {
@@ -1883,6 +2103,24 @@ function buyShip(id) {
 }
 
 // ---------- Wire UI ----------
+// Math gate + grade pills + enemy guide
+document.querySelectorAll('.grade-pill').forEach(p => {
+  p.onclick = () => { setMathGrade(p.dataset.grade); updateTitleStats(); };
+});
+document.getElementById('math-submit').onclick = submitMathAnswer;
+document.getElementById('math-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); submitMathAnswer(); }
+});
+document.getElementById('enemies-btn').onclick = () => {
+  document.getElementById('title').classList.add('hidden');
+  document.getElementById('enemies').classList.remove('hidden');
+  renderEnemyGuide();
+};
+document.getElementById('enemies-back').onclick = () => {
+  document.getElementById('enemies').classList.add('hidden');
+  document.getElementById('title').classList.remove('hidden');
+};
+
 document.getElementById('start-btn').onclick = () => {
   try { audio(); } catch (e) { /* mobile may block AudioContext — keep going, sfx is non-critical */ }
   startGame();

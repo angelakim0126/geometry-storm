@@ -4,8 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <meta name="theme-color" content="#05060f" />
-  <title>Geometry Shooter</title>
-  <link rel="stylesheet" href="styles.css?v=20260615e" />
+  <title>Geometric Shooter</title>
+  <link rel="stylesheet" href="styles.css?v=20260615f" />
 </head>
 <body>
   <a href="https://angelakim0126.github.io/gaminghub/" aria-label="Back to George's Game Hub" id="workshop-link">← Game Hub</a>
@@ -69,7 +69,7 @@
         <polygon points="100,90 122,140 78,140" fill="none" stroke="#fff85d" stroke-width="2" stroke-linejoin="round" />
       </svg>
     </div>
-    <h1>GEOMETRY <span class="storm">SHOOTER</span></h1>
+    <h1>GEOMETRIC <span class="storm">SHOOTER</span></h1>
     <p class="tagline">Survive the waves. Build the combo. Beat the score.</p>
 
     <div class="title-stats">
@@ -81,8 +81,17 @@
 
     <div class="title-loadout"><span id="title-ship">🛸 Scout · Lv 0/20</span></div>
 
+    <div class="grade-row" aria-label="Math difficulty">
+      <span class="grade-label">Math:</span>
+      <button class="grade-pill" data-grade="7">7th</button>
+      <button class="grade-pill" data-grade="8">8th</button>
+      <button class="grade-pill" data-grade="9">9th</button>
+      <button class="grade-pill" data-grade="10">10th</button>
+    </div>
+
     <button class="btn btn-primary" id="start-btn">START</button>
     <button class="btn btn-ghost" id="shop-btn">🪙 Shop</button>
+    <button class="btn btn-ghost" id="enemies-btn">👾 Enemies</button>
     <button class="btn btn-ghost" id="how-btn">How to Play</button>
 
     <div class="footer-tag">Made by Mom</div>
@@ -123,9 +132,9 @@
         <p>Strike an enemy at one of its corners (vertices) for <b>2× damage</b>. Triangles have 3 weak points, hexagons 6, octagons 8. Orbiter circles have none.</p>
       </div>
       <div class="how-card">
-        <div class="how-icon">π</div>
-        <h3>Prime Waves</h3>
-        <p>Prime-numbered waves (2, 3, 5, 7, 11…) have <b>2× drop rate</b> and <b>2× clear bonus</b>. Wave-clear pays <b>Σ(1..N)·10</b> points — triangular numbers.</p>
+        <div class="how-icon">🧮</div>
+        <h3>Math Gate</h3>
+        <p>After each wave, solve a grade-appropriate math problem to launch the next one. Correct = <b>+150 🪙 +100 score</b>. Pick your grade on the title screen.</p>
       </div>
       <div class="how-card">
         <div class="how-icon">⌨️</div>
@@ -180,9 +189,30 @@
     <button class="btn btn-primary" id="shop-back">Back</button>
   </div>
 
+  <!-- Math gate (between waves) -->
+  <div id="math-gate" class="screen hidden">
+    <div class="math-card">
+      <div class="math-header">
+        <span class="math-tag" id="math-grade">Grade 7</span>
+        <span class="math-sub">Solve to launch the next wave</span>
+      </div>
+      <div class="math-prompt" id="math-prompt">Loading…</div>
+      <input type="text" id="math-input" inputmode="decimal" autocomplete="off" placeholder="Your answer" />
+      <div class="math-feedback" id="math-feedback"></div>
+      <button class="btn btn-primary" id="math-submit">Submit</button>
+    </div>
+  </div>
+
+  <!-- Enemies guide -->
+  <div id="enemies" class="screen hidden">
+    <h2>Enemies</h2>
+    <div class="enemy-grid" id="enemy-grid"></div>
+    <button class="btn btn-primary" id="enemies-back">Back</button>
+  </div>
+
   <!-- Sound toggle -->
   <button id="sound-btn" class="icon-btn" title="Mute (M)">🔊</button>
 
-  <script src="app.js?v=20260615e"></script>
+  <script src="app.js?v=20260615f"></script>
 </body>
 </html>
