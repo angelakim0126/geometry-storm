@@ -24,11 +24,17 @@ html, body {
   color: var(--ink);
   font-family: 'Quicksand', 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   overflow: hidden;
-  touch-action: none;
+  /* `manipulation` keeps clicks fast (no 300ms tap delay) but does NOT
+     block taps the way `none` does. iPad Safari was eating START taps
+     when the body was set to `touch-action: none`. */
+  touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
   -webkit-user-select: none;
   user-select: none;
 }
+
+/* Make sure every interactive element opts into fast taps */
+button, a, input, .btn, .grade-pill, .shop-buy { touch-action: manipulation; }
 
 canvas#game {
   position: fixed;
@@ -36,6 +42,9 @@ canvas#game {
   width: 100%;
   height: 100%;
   display: block;
+  /* Block default browser gestures on the canvas itself — this is the
+     surface where joysticks live during gameplay. */
+  touch-action: none;
 }
 
 .hidden { display: none !important; }

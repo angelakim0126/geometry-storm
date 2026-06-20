@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <meta name="theme-color" content="#05060f" />
   <title>Geometric Shooter</title>
-  <link rel="stylesheet" href="styles.css?v=20260615f" />
+  <link rel="stylesheet" href="styles.css?v=20260615i" />
 </head>
 <body>
   <a href="https://angelakim0126.github.io/gaminghub/" aria-label="Back to George's Game Hub" id="workshop-link">← Game Hub</a>
@@ -89,10 +89,12 @@
       <button class="grade-pill" data-grade="10">10th</button>
     </div>
 
-    <button class="btn btn-primary" id="start-btn">START</button>
-    <button class="btn btn-ghost" id="shop-btn">🪙 Shop</button>
-    <button class="btn btn-ghost" id="enemies-btn">👾 Enemies</button>
-    <button class="btn btn-ghost" id="how-btn">How to Play</button>
+    <!-- ontouchstart="" works around an old iOS Safari quirk where click
+         events don't fire reliably on elements without any touch listener -->
+    <button class="btn btn-primary" id="start-btn" ontouchstart="">START</button>
+    <button class="btn btn-ghost" id="shop-btn" ontouchstart="">🪙 Shop</button>
+    <button class="btn btn-ghost" id="enemies-btn" ontouchstart="">👾 Enemies</button>
+    <button class="btn btn-ghost" id="how-btn" ontouchstart="">How to Play</button>
 
     <div class="footer-tag">Made by Mom</div>
   </div>
@@ -213,6 +215,6 @@
   <!-- Sound toggle -->
   <button id="sound-btn" class="icon-btn" title="Mute (M)">🔊</button>
 
-  <script src="app.js?v=20260615h"></script>
+  <script src="app.js?v=20260615i"></script>
 </body>
 </html>
