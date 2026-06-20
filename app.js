@@ -34,40 +34,166 @@ function isPrime(n) {
 // Answers are always exact numbers; checks are integer-equal or |delta| < 1e-3.
 const MATH_GENS = {
   '7': [
-    () => { const a = randi(-12, 12), b = randi(-12, 12); return { prompt: `${a} × ${b} = ?`, answer: a * b }; },
-    () => { const a = randi(2, 9), b = randi(2, 12); return { prompt: `${a * b} ÷ ${a} = ?`, answer: b }; },
-    () => { const a = randi(2, 9), b = randi(1, 20), c = a * randi(2, 12) + b; return { prompt: `Solve for x:  ${a}x + ${b} = ${c}`, answer: (c - b) / a }; },
-    () => { const p = randi(1, 9) * 5, of = randi(2, 20) * 10; return { prompt: `${p}% of ${of} = ?`, answer: p * of / 100 }; },
-    () => { const a = randi(2, 9), b = randi(2, 9); return { prompt: `(-${a}) × ${b} = ?`, answer: -a * b }; },
-    () => { const a = randi(4, 9), b = randi(2, 6); return { prompt: `${a}² − ${b}² = ?`, answer: a * a - b * b }; },
-    () => { const a = randi(2, 9), b = randi(2, 9); return { prompt: `4 + ${a} × (${b + 2} − ${b}) = ?`, answer: 4 + a * 2 }; },
+    // Two-step with negatives: -3x + 7 = -8 → x=5
+    () => { const x = randi(2, 9), a = randi(2, 6), b = randi(-9, 9); const c = -a * x + b; return { prompt: `Solve for x:  −${a}x + ${b >= 0 ? b : '(' + b + ')'} = ${c}`, answer: x }; },
+    // Variables on both sides: 5x - 8 = 2x + 7 → x=5
+    () => { const x = randi(2, 8), a = randi(3, 7), b = randi(1, a - 1), c = randi(-9, 9); return { prompt: `Solve:  ${a}x + ${c} = ${b}x + ${(a - b) * x + c}`, answer: x }; },
+    // Distributive: 4(2x - 3) + 5 = 25 → x=4
+    () => { const a = randi(2, 5), x = randi(2, 7), b = randi(2, 6), c = randi(-5, 5); const total = a * (2 * x - b) + c; return { prompt: `${a}(2x − ${b}) + ${c} = ${total}.  x = ?`, answer: x }; },
+    // Negative arithmetic: (-7) - (-12) + (-3) = 2
+    () => { const a = randi(-15, 15), b = randi(-15, 15), c = randi(-15, 15); return { prompt: `(${a}) − (${b}) + (${c}) = ?`, answer: a - b + c }; },
+    // Combined percent: 80 → +25% → -10%
+    () => { const start = randi(4, 10) * 20, up = [10, 20, 25][randi(0, 2)], dn = [10, 15, 20][randi(0, 2)]; const ans = Math.round(start * (1 + up / 100) * (1 - dn / 100) * 100) / 100; return { prompt: `${start} increased by ${up}%, then decreased by ${dn}% = ?`, answer: ans }; },
+    // Ratio: 3:5 = x:25 → x=15
+    () => { const a = randi(2, 7), b = randi(a + 1, a + 7), k = randi(2, 8); return { prompt: `${a}:${b} = x:${b * k}.  x = ?`, answer: a * k }; },
+    // Order of ops: 24 ÷ 2 - 5 × (3-1) → 12 - 10 = 2
+    () => { const a = randi(2, 6), b = randi(2, 5), c = randi(2, 6), d = randi(2, 4); return { prompt: `${a * b * 2} ÷ ${a} − ${c} × (${d + 1} − ${d}) = ?`, answer: b * 2 - c }; },
+    // Mixed fraction: 3/4 + 5/6 over 12 → 19
+    () => { const ans = 14 + randi(0, 8); return { prompt: `2/3 + 5/12 + 1/4 written with denominator 12, the numerator is ?`, answer: 8 + 5 + 3 }; },
+    // GCD/divisibility
+    () => { const a = randi(2, 6), b = randi(3, 6), x = a * b * randi(2, 5), y = a * b * randi(3, 7); return { prompt: `Greatest common factor of ${x} and ${y} ≥ ${a * b}.  GCF = ?`, answer: gcd(x, y) }; },
   ],
   '8': [
-    () => { const a = randi(2, 5), b = randi(2, 6); return { prompt: `${a}^${b} = ?`, answer: Math.pow(a, b) }; },
-    () => { const r = randi(2, 20); return { prompt: `√${r * r} = ?`, answer: r }; },
-    () => { const a = randi(2, 6), b = randi(2, 9), c = a * (randi(3, 9) + b) - a * b; const x = c / a + 0; return { prompt: `Solve for x:  ${a}(x + ${b}) = ${c + a * b}`, answer: c / a }; },
-    () => { const a = randi(3, 8), b = randi(3, 12); return { prompt: `Pythagorean: a=${a}, b=${b}. Find c² (= a² + b²)`, answer: a * a + b * b }; },
-    () => { const a = randi(3, 9), b = randi(2, 9); return { prompt: `${a * b} ÷ ${a} + ${b} = ?`, answer: b + b }; },
-    () => { const a = randi(2, 9); return { prompt: `(-${a})³ = ?`, answer: -a * a * a }; },
-    () => { const a = randi(1, 9), p = randi(2, 4); return { prompt: `${a}.0 × 10^${p} = ?`, answer: a * Math.pow(10, p) }; },
+    // Real Pythagorean (find c, not c²)
+    () => { const triples = [[3, 4, 5], [5, 12, 13], [8, 15, 17], [7, 24, 25], [9, 40, 41], [20, 21, 29], [6, 8, 10], [9, 12, 15]]; const t = triples[randi(0, triples.length - 1)]; return { prompt: `Right triangle legs ${t[0]} and ${t[1]}. Hypotenuse = ?`, answer: t[2] }; },
+    // Sum of squares + sqrt: √(9 + 16) = 5
+    () => { const a = randi(3, 8), b = randi(3, 12); return { prompt: `√(${a}² + ${b}²) (round to 2 decimals)`, answer: Math.round(Math.sqrt(a * a + b * b) * 100) / 100 }; },
+    // 2^x = N
+    () => { const p = randi(3, 7); return { prompt: `2^x = ${Math.pow(2, p)}.  x = ?`, answer: p }; },
+    // Powers + sums
+    () => { const a = randi(2, 4), b = randi(2, 3); return { prompt: `${a}^${randi(2, 4)} + ${b}^${randi(2, 4)} where exponents are 4 and 3 respectively: ${a}^4 + ${b}^3 = ?`, answer: Math.pow(a, 4) + Math.pow(b, 3) }; },
+    // Three-step linear: 3(x + 4) - 2x = 19
+    () => { const x = randi(2, 9), b = randi(2, 6); const lhs = 3 * (x + b) - 2 * x; return { prompt: `3(x + ${b}) − 2x = ${lhs}.  x = ?`, answer: x }; },
+    // Solve quadratic-square: x² = N
+    () => { const x = randi(5, 14); return { prompt: `x² = ${x * x}.  Positive value of x = ?`, answer: x }; },
+    // Slope through two points
+    () => { const m = randi(-4, 5) || 2, x1 = randi(-4, 4), y1 = randi(-6, 6), dx = randi(2, 5); return { prompt: `Slope of line through (${x1}, ${y1}) and (${x1 + dx}, ${y1 + m * dx}) = ?`, answer: m }; },
+    // f(x) = 2x² - x at given x
+    () => { const x = randi(-3, 5); return { prompt: `f(x) = 2x² − x.  f(${x}) = ?`, answer: 2 * x * x - x }; },
+    // Scientific notation arithmetic
+    () => { const a = randi(2, 9), b = randi(2, 9), p = randi(2, 4); return { prompt: `${a} × 10^${p} + ${b} × 10^${p - 1} = ?`, answer: a * Math.pow(10, p) + b * Math.pow(10, p - 1) }; },
+    // Simplify cube root
+    () => { const x = randi(2, 5); return { prompt: `∛${x * x * x} = ?`, answer: x }; },
   ],
   '9': [
-    () => { const r1 = randi(1, 8), r2 = randi(1, 8); return { prompt: `Factor x² + ${r1 + r2}x + ${r1 * r2}. Larger root r in x² + bx + c = (x+r1)(x+r2)?`, answer: Math.max(r1, r2), hint: `(x + a)(x + b) form` }; },
-    () => { const x1 = randi(-5, 5), y1 = randi(-5, 5), m = randi(2, 5), x2 = x1 + randi(1, 4); const y2 = y1 + m * (x2 - x1); return { prompt: `Line through (${x1}, ${y1}) and (${x2}, ${y2}). Slope = ?`, answer: m }; },
-    () => { const a = randi(2, 6), b = randi(-9, 9), x = randi(-6, 6); return { prompt: `f(x) = ${a}x ${b >= 0 ? '+ ' + b : '− ' + (-b)}.  f(${x}) = ?`, answer: a * x + b }; },
-    () => { const x = randi(1, 8), y = randi(1, 8); return { prompt: `Solve: x + y = ${x + y}, x − y = ${x - y}.  x = ?`, answer: x }; },
-    () => { const a = randi(3, 8), b = randi(3, 9); return { prompt: `Distance from (0,0) to (${a}, ${b}). (Round to 2 decimals.)`, answer: Math.round(Math.sqrt(a * a + b * b) * 100) / 100 }; },
-    () => { const a = randi(2, 6), b = randi(2, 6); return { prompt: `(${a}x + ${b}) − (${a - 1}x + ${b - 1}) simplifies to x + ?`, answer: 1 }; },
+    // Quadratic factoring — give larger root
+    () => {
+      const r1 = randi(-6, -1), r2 = randi(1, 7);
+      const b = -(r1 + r2), c = r1 * r2;
+      const bStr = b >= 0 ? `+ ${b}` : `− ${-b}`;
+      const cStr = c >= 0 ? `+ ${c}` : `− ${-c}`;
+      return { prompt: `Roots of x² ${bStr}x ${cStr} = 0.  Larger root = ?`, answer: Math.max(r1, r2) };
+    },
+    // Quadratic formula proper
+    () => {
+      const roots = [[1, 6], [2, 5], [3, 4], [-2, 6], [-3, 5], [1, 8]];
+      const [r1, r2] = roots[randi(0, roots.length - 1)];
+      const b = -(r1 + r2), c = r1 * r2;
+      const bStr = b >= 0 ? `+ ${b}` : `− ${-b}`;
+      const cStr = c >= 0 ? `+ ${c}` : `− ${-c}`;
+      return { prompt: `x² ${bStr}x ${cStr} = 0.  Larger root = ?`, answer: Math.max(r1, r2) };
+    },
+    // Function composition
+    () => {
+      const a = randi(2, 4), b = randi(1, 5), x = randi(2, 4);
+      return { prompt: `f(x) = ${a}x + ${b}.  g(x) = x².  f(g(${x})) = ?`, answer: a * x * x + b };
+    },
+    // Distance formula
+    () => {
+      const triples = [[3, 4, 5], [5, 12, 13], [8, 15, 17], [7, 24, 25]];
+      const t = triples[randi(0, triples.length - 1)];
+      return { prompt: `Distance from (0, 0) to (${t[0]}, ${t[1]}) = ?`, answer: t[2] };
+    },
+    // Slope-intercept from standard form
+    () => {
+      const a = randi(2, 5), b = randi(2, 4), k = a * randi(3, 8);
+      return { prompt: `${a}x + ${b}y = ${k}.  y-intercept = ?`, answer: k / b };
+    },
+    // Systems of equations
+    () => {
+      const x = randi(2, 6), y = randi(1, 5);
+      return { prompt: `Solve:  3x − y = ${3 * x - y},  x + 2y = ${x + 2 * y}.  x = ?`, answer: x };
+    },
+    // Vertex of parabola: y = x² - 8x + 11 → vertex x = 4
+    () => {
+      const h = randi(2, 6), k = randi(-5, 5);
+      // y = (x - h)² + k = x² - 2hx + h² + k
+      return { prompt: `Parabola  y = x² − ${2 * h}x + ${h * h + k}.  Vertex x-coordinate = ?`, answer: h };
+    },
+    // Simplify radical: √72 = a√b where b is square-free
+    () => {
+      const a = randi(2, 6), b = [2, 3, 5, 6, 7][randi(0, 4)];
+      return { prompt: `Simplify  √${a * a * b} = a√${b}.  a = ?`, answer: a };
+    },
+    // Inequality: 3x - 5 < 16 → x < 7
+    () => {
+      const a = randi(2, 5), b = randi(1, 9), x = randi(3, 8);
+      return { prompt: `${a}x − ${b} < ${a * x - b + 1}.  Largest integer x that satisfies = ?`, answer: x };
+    },
   ],
   '10': [
-    () => { const r1 = randi(1, 6), r2 = randi(1, 6); return { prompt: `Roots of x² − ${r1 + r2}x + ${r1 * r2} = 0. Larger root = ?`, answer: Math.max(r1, r2) }; },
-    () => { const choices = [{ a: 30, v: 0.5 }, { a: 60, v: Math.round(Math.sqrt(3) / 2 * 1000) / 1000 }, { a: 45, v: Math.round(Math.sqrt(2) / 2 * 1000) / 1000 }, { a: 90, v: 1 }, { a: 0, v: 0 }]; const c = choices[randi(0, choices.length - 1)]; return { prompt: `sin(${c.a}°) = ?  (3 decimals)`, answer: c.v }; },
-    () => { const b = [2, 3, 4, 5][randi(0, 3)], p = randi(2, 5); return { prompt: `log_${b}(${Math.pow(b, p)}) = ?`, answer: p }; },
-    () => { const r = randi(2, 12); return { prompt: `Area of circle with radius ${r}, in terms of π. (Just the coefficient.) ${r}² = ?`, answer: r * r }; },
-    () => { const a = randi(2, 6), b = randi(2, 6); return { prompt: `(x + ${a})(x − ${b}) = x² + cx + d. c = ?`, answer: a - b }; },
-    () => { const n = randi(3, 8); return { prompt: `Sum of interior angles of a ${n}-gon (degrees) = (n−2)·180 = ?`, answer: (n - 2) * 180 }; },
+    // Quadratic formula — sum of roots (Vieta)
+    () => {
+      const r1 = randi(-4, 4) || 1, r2 = randi(-4, 4) || -1;
+      const b = -(r1 + r2), c = r1 * r2;
+      const bStr = b >= 0 ? `+ ${b}` : `− ${-b}`;
+      const cStr = c >= 0 ? `+ ${c}` : `− ${-c}`;
+      return { prompt: `x² ${bStr}x ${cStr} = 0.  Sum of roots = ?`, answer: r1 + r2 };
+    },
+    // Trig identity: sin² + cos² = 1
+    () => {
+      const a = [30, 45, 60][randi(0, 2)];
+      return { prompt: `sin²(${a}°) + cos²(${a}°) = ?`, answer: 1 };
+    },
+    // sin · cos at specific angles
+    () => {
+      const opts = [{ a: 30, v: Math.round(Math.sqrt(3) / 4 * 1000) / 1000 }, { a: 45, v: 0.5 }, { a: 60, v: Math.round(Math.sqrt(3) / 4 * 1000) / 1000 }];
+      const o = opts[randi(0, 2)];
+      return { prompt: `sin(${o.a}°) × cos(${o.a}°) = ?  (3 decimals)`, answer: o.v };
+    },
+    // Combined log
+    () => {
+      const a = [2, 3, 4, 5][randi(0, 3)], p1 = randi(2, 5);
+      const b = [2, 3, 4][randi(0, 2)], p2 = randi(2, 4);
+      return { prompt: `log_${a}(${Math.pow(a, p1)}) + log_${b}(${Math.pow(b, p2)}) = ?`, answer: p1 + p2 };
+    },
+    // Polynomial expansion: constant term of (x+a)(x-b)(x+c)
+    () => {
+      const a = randi(2, 5), b = randi(2, 5), c = randi(2, 5);
+      return { prompt: `Constant term of (x + ${a})(x − ${b})(x + ${c}) = ?`, answer: a * -b * c };
+    },
+    // Vector magnitude
+    () => {
+      const triples = [[3, 4, 5], [5, 12, 13], [8, 15, 17], [7, 24, 25], [20, 21, 29]];
+      const t = triples[randi(0, triples.length - 1)];
+      return { prompt: `Magnitude of vector ⟨${t[0]}, ${t[1]}⟩ = ?`, answer: t[2] };
+    },
+    // Area of right triangle with given legs
+    () => {
+      const a = randi(3, 12), b = randi(4, 15);
+      return { prompt: `Right triangle with legs ${a} and ${b}.  Area = ?`, answer: a * b / 2 };
+    },
+    // Absolute value equation: |2x - 3| = 11 → larger x = 7
+    () => {
+      const a = randi(2, 5), b = randi(1, 7), x = randi(3, 8);
+      const k = a * x - b;
+      return { prompt: `|${a}x − ${b}| = ${k}.  Larger solution x = ?`, answer: x };
+    },
+    // Composition of sqrt: f(f(81)) where f(x) = √x
+    () => {
+      const x4 = [16, 81, 256, 625, 1296][randi(0, 4)];
+      const x = Math.round(Math.sqrt(Math.sqrt(x4)));
+      return { prompt: `f(x) = √x.  f(f(${x4})) = ?`, answer: x };
+    },
+    // Polygon angle sum
+    () => {
+      const n = randi(4, 12);
+      return { prompt: `Sum of interior angles of a ${n}-gon (degrees) = ?`, answer: (n - 2) * 180 };
+    },
   ],
 };
+
+function gcd(a, b) { a = Math.abs(a); b = Math.abs(b); while (b) { [a, b] = [b, a % b]; } return a; }
 
 function nextMathProblem() {
   const grade = state.mathGrade || '7';
@@ -206,6 +332,9 @@ const SHIPS = {
   vortex:  { name: 'Vortex',  icon: '🌀', cost: 4500, color: '#c084fc', desc: 'Shots briefly slow enemies they hit.',mods: { bulletEffect: 'slow' } },
   comet:   { name: 'Comet',   icon: '☄️', cost: 6500, color: '#ff8c42', desc: 'Bullets explode on impact (small AoE).', mods: { bulletEffect: 'explode' } },
   trident: { name: 'Trident', icon: '🔱', cost: 9000, color: '#5ee3e0', desc: 'Always triple-shot · −25% fire rate.',  mods: { fireMul: 1.25, alwaysTriple: true } },
+  inferno: { name: 'Inferno', icon: '🔥', cost: 12000, color: '#ff6b35', desc: 'Bullets ignite enemies for damage-over-time.', mods: { bulletEffect: 'fire' } },
+  photon:  { name: 'Photon',  icon: '✨', cost: 16000, color: '#b794f6', desc: 'Bullets pierce through up to 2 extra enemies.', mods: { bulletEffect: 'pierce' } },
+  voltage: { name: 'Voltage', icon: '⚡', cost: 22000, color: '#fbbf24', desc: 'Kills chain damage to the nearest enemy within range.', mods: { bulletEffect: 'chain' } },
 };
 
 function loadUpgrades() {
@@ -609,6 +738,64 @@ const SHIP_DRAW = {
     ctx.moveTo(r * 0.5, 0); ctx.lineTo(-r * 0.55, 0);
     ctx.stroke();
   },
+  inferno(r) {
+    // Flame-shaped fighter with curved tail tips
+    ctx.beginPath();
+    ctx.moveTo(r * 1.3, 0);
+    ctx.bezierCurveTo(r * 0.7, -r * 0.4, r * 0.2, -r * 0.55, -r * 0.2, -r * 0.85);
+    ctx.lineTo(-r * 0.5, -r * 0.35);
+    ctx.lineTo(-r * 0.85, -r * 0.55);
+    ctx.lineTo(-r * 0.95, 0);
+    ctx.lineTo(-r * 0.85, r * 0.55);
+    ctx.lineTo(-r * 0.5, r * 0.35);
+    ctx.lineTo(-r * 0.2, r * 0.85);
+    ctx.bezierCurveTo(r * 0.2, r * 0.55, r * 0.7, r * 0.4, r * 1.3, 0);
+    ctx.closePath();
+    ctx.stroke();
+    // Inner flame curl
+    ctx.beginPath();
+    ctx.arc(r * 0.2, 0, r * 0.32, -Math.PI * 0.6, Math.PI * 0.6);
+    ctx.stroke();
+  },
+  photon(r) {
+    // Prism / crystal-light shape — outer diamond with bright inner beam
+    ctx.beginPath();
+    ctx.moveTo(r * 1.4, 0);
+    ctx.lineTo(r * 0.2, -r * 0.85);
+    ctx.lineTo(-r * 0.85, -r * 0.35);
+    ctx.lineTo(-r * 0.85, r * 0.35);
+    ctx.lineTo(r * 0.2, r * 0.85);
+    ctx.closePath();
+    ctx.stroke();
+    // Inner beam axis + diagonals
+    ctx.beginPath();
+    ctx.moveTo(r * 1.4, 0); ctx.lineTo(-r * 0.85, 0);
+    ctx.moveTo(r * 0.2, -r * 0.85); ctx.lineTo(r * 0.2, r * 0.85);
+    ctx.stroke();
+  },
+  voltage(r) {
+    // Jagged lightning-bolt silhouette
+    ctx.beginPath();
+    ctx.moveTo(r * 1.35, -r * 0.05);
+    ctx.lineTo(r * 0.55, -r * 0.6);
+    ctx.lineTo(r * 0.75, -r * 0.15);
+    ctx.lineTo(r * 0.05, -r * 0.85);
+    ctx.lineTo(-r * 0.35, -r * 0.4);
+    ctx.lineTo(-r * 0.85, -r * 0.55);
+    ctx.lineTo(-r * 0.65, 0);
+    ctx.lineTo(-r * 0.85, r * 0.55);
+    ctx.lineTo(-r * 0.35, r * 0.4);
+    ctx.lineTo(r * 0.05, r * 0.85);
+    ctx.lineTo(r * 0.75, r * 0.15);
+    ctx.lineTo(r * 0.55, r * 0.6);
+    ctx.closePath();
+    ctx.stroke();
+    // Spark in the core
+    ctx.beginPath();
+    ctx.moveTo(r * 0.4, -r * 0.2);
+    ctx.lineTo(-r * 0.2, r * 0.2);
+    ctx.stroke();
+  },
 };
 
 // Per-ship engine attachment points (offsets from ship center in local
@@ -622,6 +809,9 @@ const SHIP_ENGINES = {
   vortex:  [{ x: -0.5, y: -0.55 }, { x: -0.5, y: 0.55 }],
   comet:   [{ x: -0.85, y: 0 }],
   trident: [{ x: -0.95, y: -0.18 }, { x: -0.95, y: 0.18 }],
+  inferno: [{ x: -0.9, y: 0 }],
+  photon:  [{ x: -0.85, y: -0.18 }, { x: -0.85, y: 0.18 }],
+  voltage: [{ x: -0.75, y: 0 }],
 };
 
 function drawPlayer(p) {
@@ -779,32 +969,38 @@ function damagePlayer(p) {
 
 // ---------- Enemies ----------
 const ENEMY_KINDS = {
-  drifter:  { hp: 1, r: 14, speed: 1.0, color: '#ff5dd2', score: 10,  coin: 1,  shape: 'hex' },
-  zoomer:   { hp: 1, r: 11, speed: 2.4, color: '#fff85d', score: 20,  coin: 2,  shape: 'tri' },
-  splitter: { hp: 2, r: 17, speed: 1.2, color: '#6ee7b7', score: 30,  coin: 3,  shape: 'sq' },
-  orbiter:  { hp: 2, r: 13, speed: 1.4, color: '#7df9ff', score: 40,  coin: 4,  shape: 'circle' },
-  tank:     { hp: 4, r: 22, speed: 0.7, color: '#ff4d6d', score: 80,  coin: 8,  shape: 'octa' },
-  shielder: { hp: 6, r: 20, speed: 0.9, color: '#a78bfa', score: 120, coin: 12, shape: 'octa' },
-  boss:     { hp: 180, r: 46, speed: 0.85, color: '#ff5dd2', score: 800, coin: 120, shape: 'star' },
+  drifter:  { hp: 2, r: 14, speed: 1.0, color: '#ff5dd2', score: 10,  coin: 1,  shape: 'hex' },
+  zoomer:   { hp: 1, r: 11, speed: 2.6, color: '#fff85d', score: 20,  coin: 2,  shape: 'tri' },
+  splitter: { hp: 3, r: 17, speed: 1.3, color: '#6ee7b7', score: 30,  coin: 3,  shape: 'sq' },
+  orbiter:  { hp: 3, r: 13, speed: 1.5, color: '#7df9ff', score: 40,  coin: 4,  shape: 'circle' },
+  tank:     { hp: 7, r: 22, speed: 0.75, color: '#ff4d6d', score: 80,  coin: 8,  shape: 'octa' },
+  shielder: { hp: 12, r: 20, speed: 0.95, color: '#a78bfa', score: 120, coin: 12, shape: 'octa' },
+  boss:     { hp: 280, r: 46, speed: 0.95, color: '#ff5dd2', score: 800, coin: 120, shape: 'star' },
 };
 
 // Per-wave HP scaling: enemies past wave 5 get tougher individually, so
 // the late-game is "stronger, not more". Bosses scale faster.
 function enemyHpScale(kind, wave) {
-  if (kind === 'boss') return 1 + Math.max(0, wave - 5) * 0.45;
-  return 1 + Math.max(0, wave - 5) * 0.18;
+  if (kind === 'boss') return 1 + Math.max(0, wave - 5) * 0.6;
+  return 1 + Math.max(0, wave - 5) * 0.32;
+}
+
+// Late-game speed boost (cap +60%) so enemies catch up to a maxed-out player.
+function enemySpeedScale(wave) {
+  return 1 + Math.min(0.6, Math.max(0, wave - 5) * 0.06);
 }
 
 function makeEnemy(kind, x, y, opts = {}) {
   const k = ENEMY_KINDS[kind];
   const scale = (opts.hp ? 1 : enemyHpScale(kind, state.wave));
   const hp = Math.ceil((opts.hp || k.hp) * scale);
+  const speed = (opts.speed || k.speed) * enemySpeedScale(state.wave);
   return {
     kind, x, y, vx: 0, vy: 0,
     r: opts.r || k.r,
     hp,
     maxHp: hp,
-    speed: opts.speed || k.speed,
+    speed,
     color: k.color,
     shape: k.shape,
     score: opts.score || k.score,
@@ -879,6 +1075,20 @@ function updateEnemy(e, dt) {
   const tailMul = state.tailMul || 1;
   e.x += e.vx * state.slowmo * slowMul * tailMul;
   e.y += e.vy * state.slowmo * slowMul * tailMul;
+
+  // Fire DoT (Inferno): every 250ms while burning, take fireDmg.
+  if (e.fireUntil && state.t < e.fireUntil) {
+    if (state.t - (e.fireLastTick || 0) > 250) {
+      e.fireLastTick = state.t;
+      e.hp -= (e.fireDmg || 0.4);
+      state.particles.push({
+        x: e.x + rand(-e.r * 0.5, e.r * 0.5),
+        y: e.y + rand(-e.r * 0.5, 0),
+        vx: rand(-0.6, 0.6), vy: -1.6,
+        size: 2.5, life: 480, age: 0, color: '#ff6b35',
+      });
+    }
+  }
 }
 
 function enemyShoot(e) {
@@ -1290,6 +1500,32 @@ function showBanner(sub, title) {
 }
 
 // ---------- Collisions ----------
+// Voltage ship: when a chain-tagged bullet kills an enemy, deal damage
+// to the nearest live enemy within `range`, with a visible spark trail.
+function chainStrike(fromX, fromY, exclude, range, baseDmg) {
+  let best = null, bestD = Infinity;
+  for (const e of state.enemies) {
+    if (e === exclude || e.hp <= 0) continue;
+    const d = len(e.x - fromX, e.y - fromY);
+    if (d < range && d < bestD) { bestD = d; best = e; }
+  }
+  if (!best) return;
+  best.hp -= Math.max(1, Math.round((baseDmg || 1) * 0.7));
+  // Lightning visual
+  const steps = 9;
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    state.particles.push({
+      x: fromX + (best.x - fromX) * t + rand(-7, 7),
+      y: fromY + (best.y - fromY) * t + rand(-7, 7),
+      vx: 0, vy: 0,
+      size: 3, life: 260, age: 0, color: '#fbbf24',
+    });
+  }
+  addFloatText((fromX + best.x) / 2, (fromY + best.y) / 2 - 8, '⚡', '#fbbf24');
+  if (best.hp <= 0) killEnemy(best);
+}
+
 function vertexHitBonus(e, bx, by) {
   // True when the bullet impact lines up with one of the polygon's
   // vertices (within ~12°). Circles/orbiters have no vertices → false.
@@ -1311,6 +1547,7 @@ function updateCollisions() {
     const b = state.bullets[i];
     for (let j = state.enemies.length - 1; j >= 0; j--) {
       const e = state.enemies[j];
+      if (b.hitIds && b.hitIds.indexOf(e) >= 0) continue;   // pierce: already hit
       if (len(b.x - e.x, b.y - e.y) < e.r + CFG.bullet.r) {
         const vertex = vertexHitBonus(e, b.x, b.y);
         const baseDmg = (b.dmg || 1);
@@ -1326,11 +1563,9 @@ function updateCollisions() {
 
         // Ship-specific bullet effect
         if (b.effect === 'slow') {
-          // Vortex — slow this enemy briefly
           e.slowUntil = state.t + 900;
           spawnParticles(b.x, b.y, '#c084fc', 10, 3, 500);
         } else if (b.effect === 'explode') {
-          // Comet — small AoE around impact
           const aoeR = 64;
           const aoeDmg = Math.max(1, Math.floor(baseDmg * 0.6));
           for (const e2 of state.enemies) {
@@ -1338,18 +1573,35 @@ function updateCollisions() {
             const d = len(e2.x - b.x, e2.y - b.y);
             if (d < aoeR + e2.r) e2.hp -= aoeDmg;
           }
-          // Visual: orange burst + screen shake
           spawnParticles(b.x, b.y, '#ff8c42', 24, 8, 600);
           shake(6);
-          // Kill anything that dropped to 0 from the AoE — iterate backward
-          for (let k = state.enemies.length - 1; k >= 0; k--) {
-            const e3 = state.enemies[k];
-            if (e3 !== e && e3.hp <= 0) killEnemy(e3);
-          }
+        } else if (b.effect === 'fire') {
+          // Inferno — ignite for DoT (handled in updateEnemy)
+          e.fireUntil = state.t + 2200;
+          e.fireLastTick = state.t;
+          e.fireDmg = baseDmg * 0.4;
+          spawnParticles(b.x, b.y, '#ff6b35', 14, 4, 600);
+        }
+
+        // Chain BEFORE deciding to splice (we need to know if e died)
+        const killedThis = e.hp <= 0;
+        if (b.effect === 'chain' && killedThis) {
+          chainStrike(e.x, e.y, e, 140, baseDmg);
+        }
+
+        // Pierce keeps the bullet alive for up to N more enemies
+        if (b.effect === 'pierce' && (b.pierceLeft === undefined || b.pierceLeft > 0)) {
+          if (b.pierceLeft === undefined) b.pierceLeft = 2;
+          b.pierceLeft--;
+          b.hitIds = b.hitIds || [];
+          b.hitIds.push(e);
+          // Don't splice; keep flying. Still resolve the kill on this enemy.
+          if (killedThis) killEnemy(e); else sfx.hit();
+          break;
         }
 
         state.bullets.splice(i, 1);
-        if (e.hp <= 0) killEnemy(e);
+        if (killedThis) killEnemy(e);
         else sfx.hit();
         break;
       }
@@ -1418,6 +1670,12 @@ function update(dt) {
   updateParticles(dt);
   updateDrops(dt);
   updateCollisions();
+  // Sweep any enemies that died via DoT / AoE / chain that didn't go
+  // through updateCollisions' kill path. Iterate backward — killEnemy
+  // splices the array.
+  for (let i = state.enemies.length - 1; i >= 0; i--) {
+    if (state.enemies[i].hp <= 0) killEnemy(state.enemies[i]);
+  }
   updateWave(dt);
 
   // Combo decay
@@ -2057,6 +2315,55 @@ function drawShipInto(c, shipId, r) {
     c.stroke();
     c.beginPath();
     c.moveTo(r * 0.5, 0); c.lineTo(-r * 0.55, 0);
+    c.stroke();
+  } else if (shipId === 'inferno') {
+    c.beginPath();
+    c.moveTo(r * 1.3, 0);
+    c.bezierCurveTo(r * 0.7, -r * 0.4, r * 0.2, -r * 0.55, -r * 0.2, -r * 0.85);
+    c.lineTo(-r * 0.5, -r * 0.35);
+    c.lineTo(-r * 0.85, -r * 0.55);
+    c.lineTo(-r * 0.95, 0);
+    c.lineTo(-r * 0.85, r * 0.55);
+    c.lineTo(-r * 0.5, r * 0.35);
+    c.lineTo(-r * 0.2, r * 0.85);
+    c.bezierCurveTo(r * 0.2, r * 0.55, r * 0.7, r * 0.4, r * 1.3, 0);
+    c.closePath();
+    c.stroke();
+    c.beginPath();
+    c.arc(r * 0.2, 0, r * 0.32, -Math.PI * 0.6, Math.PI * 0.6);
+    c.stroke();
+  } else if (shipId === 'photon') {
+    c.beginPath();
+    c.moveTo(r * 1.4, 0);
+    c.lineTo(r * 0.2, -r * 0.85);
+    c.lineTo(-r * 0.85, -r * 0.35);
+    c.lineTo(-r * 0.85, r * 0.35);
+    c.lineTo(r * 0.2, r * 0.85);
+    c.closePath();
+    c.stroke();
+    c.beginPath();
+    c.moveTo(r * 1.4, 0); c.lineTo(-r * 0.85, 0);
+    c.moveTo(r * 0.2, -r * 0.85); c.lineTo(r * 0.2, r * 0.85);
+    c.stroke();
+  } else if (shipId === 'voltage') {
+    c.beginPath();
+    c.moveTo(r * 1.35, -r * 0.05);
+    c.lineTo(r * 0.55, -r * 0.6);
+    c.lineTo(r * 0.75, -r * 0.15);
+    c.lineTo(r * 0.05, -r * 0.85);
+    c.lineTo(-r * 0.35, -r * 0.4);
+    c.lineTo(-r * 0.85, -r * 0.55);
+    c.lineTo(-r * 0.65, 0);
+    c.lineTo(-r * 0.85, r * 0.55);
+    c.lineTo(-r * 0.35, r * 0.4);
+    c.lineTo(r * 0.05, r * 0.85);
+    c.lineTo(r * 0.75, r * 0.15);
+    c.lineTo(r * 0.55, r * 0.6);
+    c.closePath();
+    c.stroke();
+    c.beginPath();
+    c.moveTo(r * 0.4, -r * 0.2);
+    c.lineTo(-r * 0.2, r * 0.2);
     c.stroke();
   } else {
     // scout
