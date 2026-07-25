@@ -428,6 +428,47 @@ canvas#game {
   box-shadow: 0 2px 12px rgba(125, 249, 255, 0.35);
 }
 
+/* ---------- Wave picker (checkpoint chips) ---------- */
+.wave-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0 14px;
+  padding: 4px 6px;
+  border-radius: 999px;
+  background: var(--panel);
+  border: 1px solid rgba(255, 248, 93, 0.28);
+  max-width: 88vw;
+}
+#wave-chips {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+#wave-chips::-webkit-scrollbar { display: none; }
+.wave-chip {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--ink-soft);
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 0.85rem;
+  cursor: pointer;
+  touch-action: manipulation;
+  white-space: nowrap;
+}
+.wave-chip:hover { color: var(--ink); }
+.wave-chip.active {
+  background: linear-gradient(135deg, var(--accent-3), #f0a500);
+  color: #0b0d24;
+  box-shadow: 0 2px 12px rgba(255, 248, 93, 0.35);
+}
+.wave-chip.locked { opacity: 0.4; cursor: not-allowed; }
+
 /* ---------- Math gate ---------- */
 #math-gate {
   background: radial-gradient(ellipse at center, rgba(11, 13, 36, 0.96) 0%, rgba(5, 6, 15, 0.99) 75%);

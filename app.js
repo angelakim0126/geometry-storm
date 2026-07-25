@@ -294,6 +294,8 @@ const state = {
   best: parseInt(localStorage.getItem('gs_best') || '0', 10),
   bestWave: parseInt(localStorage.getItem('gs_best_wave') || '0', 10),
   totalKills: parseInt(localStorage.getItem('gs_kills') || '0', 10),
+  highestWaveCleared: parseInt(localStorage.getItem('gs_highest_wave') || '0', 10),
+  startWave: 0,   // 0 = default to highest checkpoint on first title render
   kills: 0,
   combo: 1,
   comboTimer: 0,
@@ -974,36 +976,64 @@ const ENEMY_KINDS = {
   splitter: { hp: 3, r: 17, speed: 1.3, color: '#6ee7b7', score: 30,  coin: 3,  shape: 'sq' },
   orbiter:  { hp: 3, r: 13, speed: 1.5, color: '#7df9ff', score: 40,  coin: 4,  shape: 'circle' },
   tank:     { hp: 7, r: 22, speed: 0.75, color: '#ff4d6d', score: 80,  coin: 8,  shape: 'octa' },
-  shielder: { hp: 12, r: 20, speed: 0.95, color: '#a78bfa', score: 120, coin: 12, shape: 'octa' },
+  // Shielder removed per George's request — replaced by three aggressive chasers below.
+  hunter:   { hp: 8, r: 15, speed: 2.1, color: '#ff3860', score: 150, coin: 14, shape: 'tri' },   // fast red diamond that chases
+  warden:   { hp: 18, r: 24, speed: 1.15, color: '#38d39f', score: 220, coin: 22, shape: 'sq' },  // green pentagon that splits on death
+  colossus: { hp: 40, r: 32, speed: 0.55, color: '#f6b93b', score: 500, coin: 55, shape: 'hex' }, // massive slow gold hex — unstoppable
   boss:     { hp: 280, r: 46, speed: 0.95, color: '#ff5dd2', score: 800, coin: 120, shape: 'star' },
 };
 
-// Per-wave HP scaling: enemies past wave 5 get tougher individually, so
-// the late-game is "stronger, not more". Bosses scale faster.
+// Per-wave HP scaling. Two-piece: linear through wave 20, then exponential
+// past wave 20 so that even a maxed-out pilot with the best ship can't
+// mow through late-game waves.
 function enemyHpScale(kind, wave) {
-  if (kind === 'boss') return 1 + Math.max(0, wave - 5) * 0.6;
-  return 1 + Math.max(0, wave - 5) * 0.32;
+  const w = Math.max(0, wave - 5);
+  const base = kind === 'boss' ? 0.6 : 0.32;
+  let s = 1 + w * base;
+  if (wave > 20) {
+    const past = wave - 20;
+    // Extra multiplier compounds — wave 25 = 1.65x, wave 30 = 2.72x, wave 40 = 7.4x
+    s *= Math.pow(kind === 'boss' ? 1.18 : 1.12, past);
+  }
+  return s;
 }
 
-// Late-game speed boost (cap +60%) so enemies catch up to a maxed-out player.
+// Late-game speed boost (cap +80% now) so enemies catch up to a maxed player.
 function enemySpeedScale(wave) {
-  return 1 + Math.min(0.6, Math.max(0, wave - 5) * 0.06);
+  return 1 + Math.min(0.8, Math.max(0, wave - 5) * 0.055);
+}
+
+// Elite spawn — any non-boss enemy can be elevated on high waves:
+// 3× HP, +30% speed, +40% size, drops 2× coins. Small % chance ramps
+// with wave so wave 25+ feels genuinely mean.
+function eliteChance(wave) {
+  if (wave < 10) return 0;
+  return Math.min(0.28, (wave - 10) * 0.018);   // 0% @ w10 → 28% @ w25+
 }
 
 function makeEnemy(kind, x, y, opts = {}) {
   const k = ENEMY_KINDS[kind];
   const scale = (opts.hp ? 1 : enemyHpScale(kind, state.wave));
-  const hp = Math.ceil((opts.hp || k.hp) * scale);
-  const speed = (opts.speed || k.speed) * enemySpeedScale(state.wave);
+  let hp = Math.ceil((opts.hp || k.hp) * scale);
+  let speed = (opts.speed || k.speed) * enemySpeedScale(state.wave);
+  let r = opts.r || k.r;
+  let score = opts.score || k.score;
+  let coin = k.coin || 1;
+  let elite = false;
+  if (!opts.hp && kind !== 'boss' && Math.random() < eliteChance(state.wave)) {
+    elite = true;
+    hp = Math.ceil(hp * 3);
+    speed *= 1.3;
+    r *= 1.4;
+    score = Math.round(score * 2);
+    coin *= 2;
+  }
   return {
     kind, x, y, vx: 0, vy: 0,
-    r: opts.r || k.r,
-    hp,
-    maxHp: hp,
-    speed,
+    r, hp, maxHp: hp, speed,
     color: k.color,
     shape: k.shape,
-    score: opts.score || k.score,
+    score, coin, elite,
     born: state.t,
     fireT: state.t + rand(800, 2200),
     orbitA: rand(0, TAU),
@@ -1027,12 +1057,26 @@ function updateEnemy(e, dt) {
   const d = len(dx, dy) || 1;
   e.spinPhase += 0.04;
 
-  if (e.kind === 'drifter' || e.kind === 'splitter' || e.kind === 'tank') {
-    // chase
+  if (e.kind === 'drifter' || e.kind === 'splitter' || e.kind === 'tank' || e.kind === 'warden' || e.kind === 'colossus') {
+    // Direct chase (colossus and warden included — George wants strong things
+    // that actually MOVE toward you)
     e.vx += (dx / d) * e.speed * 0.12;
     e.vy += (dy / d) * e.speed * 0.12;
     e.vx *= 0.92; e.vy *= 0.92;
     const cap = e.speed;
+    const sp = len(e.vx, e.vy);
+    if (sp > cap) { e.vx = e.vx / sp * cap; e.vy = e.vy / sp * cap; }
+  } else if (e.kind === 'hunter') {
+    // Aggressive dasher — steers straight for you with a periodic burst
+    // that makes it hard to kite. No shooting.
+    e.vx += (dx / d) * e.speed * 0.18;
+    e.vy += (dy / d) * e.speed * 0.18;
+    // Dash surge every ~1.8s at ×1.7 max speed
+    e.dashT = (e.dashT || 0) + dt;
+    const dashing = e.dashT > 1400 && e.dashT < 1900;
+    if (e.dashT > 1900) e.dashT = 0;
+    const cap = e.speed * (dashing ? 1.7 : 1);
+    e.vx *= 0.9; e.vy *= 0.9;
     const sp = len(e.vx, e.vy);
     if (sp > cap) { e.vx = e.vx / sp * cap; e.vy = e.vy / sp * cap; }
   } else if (e.kind === 'zoomer') {
@@ -1124,8 +1168,8 @@ function drawEnemy(e) {
   ctx.translate(e.x, e.y);
   ctx.strokeStyle = e.color;
   ctx.shadowColor = e.color;
-  ctx.shadowBlur = 14;
-  ctx.lineWidth = 2.5;
+  ctx.shadowBlur = e.elite ? 22 : 14;
+  ctx.lineWidth = e.elite ? 3.4 : 2.5;
   const r = e.r;
   ctx.rotate(e.spinPhase);
 
@@ -1140,6 +1184,16 @@ function drawEnemy(e) {
     drawStar(5, r, r * 0.5);
     ctx.shadowBlur = 22;
     drawStar(5, r * 0.7, r * 0.35);
+  }
+
+  // Elite: white pulsing halo ring around the enemy
+  if (e.elite) {
+    ctx.shadowBlur = 24;
+    ctx.strokeStyle = `rgba(255, 255, 255, ${0.5 + 0.3 * Math.sin(state.t / 140)})`;
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    ctx.arc(0, 0, r + 6, 0, TAU);
+    ctx.stroke();
   }
 
   // HP indicator for tougher enemies
@@ -1225,6 +1279,18 @@ function killEnemy(e, fromPlayer = true) {
       baby.vy = Math.sin(a) * 2.5;
       state.enemies.push(baby);
     }
+  }
+  // Warden explodes into 3 fast zoomers on death — punishes killing it
+  // in the middle of a swarm.
+  if (e.kind === 'warden') {
+    for (let i = 0; i < 3; i++) {
+      const a = (i / 3) * TAU + rand(-0.3, 0.3);
+      const baby = makeEnemy('zoomer', e.x + Math.cos(a) * 14, e.y + Math.sin(a) * 14, { r: 9, hp: 1, score: 20 });
+      baby.vx = Math.cos(a) * 3.5;
+      baby.vy = Math.sin(a) * 3.5;
+      state.enemies.push(baby);
+    }
+    addFloatText(e.x, e.y - 30, 'WARDEN BURST!', '#38d39f');
   }
 
   // Remove from array
@@ -1402,33 +1468,31 @@ function buildWave(n) {
     q.push({ kind: 'boss', delay: 600 });
     const minions = Math.min(6, 1 + Math.floor(n / 8));
     for (let i = 0; i < minions; i++) {
-      // Higher boss waves bring tougher escorts
       const r = Math.random();
-      const escort = n >= 20 ? (r < 0.4 ? 'shielder' : 'orbiter')
-                   : n >= 10 ? (r < 0.5 ? 'tank' : 'orbiter')
+      // Boss escorts scale up: orbiters → tanks/hunters → wardens/colossus
+      const escort = n >= 20 ? (r < 0.35 ? 'colossus' : r < 0.7 ? 'warden' : 'hunter')
+                   : n >= 15 ? (r < 0.4 ? 'warden' : r < 0.75 ? 'hunter' : 'orbiter')
+                   : n >= 10 ? (r < 0.5 ? 'tank' : r < 0.8 ? 'hunter' : 'orbiter')
                    : 'orbiter';
       q.push({ kind: escort, delay: 750 });
     }
     return q;
   }
-  // Mini-boss waves at 8, 12, 16 (not 20 — that's a major boss) — one Tank + many minions
+  // Mini-boss waves at 8, 12, 16 — a tough anchor + swarm
   const isMiniBoss = (n === 8 || n === 12 || n === 16 || (n >= 22 && (n - 22) % 5 === 2));
   if (isMiniBoss) {
-    q.push({ kind: 'tank', delay: 500 });
-    q.push({ kind: 'shielder', delay: 700 });
+    q.push({ kind: n >= 16 ? 'colossus' : 'tank', delay: 500 });
+    q.push({ kind: 'warden', delay: 700 });
     const swarm = 6 + Math.floor(n / 4);
     for (let i = 0; i < swarm; i++) {
       const r = Math.random();
-      const k = r < 0.5 ? 'zoomer' : r < 0.85 ? 'splitter' : 'orbiter';
+      const k = r < 0.4 ? 'zoomer' : r < 0.7 ? 'hunter' : r < 0.9 ? 'splitter' : 'orbiter';
       q.push({ kind: k, delay: rand(380, 620) });
     }
     return q;
   }
-  // Spawn-delay scales down with wave so high waves feel intense.
   const minDelay = Math.max(220, 450 - n * 12);
   const maxDelay = Math.max(420, 850 - n * 20);
-  // Fewer enemies than before, but the HP scaling in makeEnemy makes
-  // each one tougher — net effect is "stronger, not more".
   const totalBase = 5 + Math.floor(n * 1.1);
   for (let i = 0; i < totalBase; i++) {
     let kind;
@@ -1440,14 +1504,17 @@ function buildWave(n) {
     } else if (n <= 6) {
       kind = r < 0.3 ? 'drifter' : r < 0.55 ? 'zoomer' : r < 0.78 ? 'splitter' : 'orbiter';
     } else if (n <= 10) {
-      // Wave 7-10: tanks join the mix
-      kind = r < 0.22 ? 'drifter' : r < 0.45 ? 'zoomer' : r < 0.65 ? 'splitter' : r < 0.85 ? 'orbiter' : 'tank';
+      // Wave 7-10: tanks + Hunter join the mix
+      kind = r < 0.18 ? 'drifter' : r < 0.4 ? 'zoomer' : r < 0.58 ? 'splitter' : r < 0.75 ? 'orbiter' : r < 0.9 ? 'tank' : 'hunter';
     } else if (n <= 14) {
-      // Wave 11-14: shielders appear
-      kind = r < 0.16 ? 'drifter' : r < 0.36 ? 'zoomer' : r < 0.54 ? 'splitter' : r < 0.74 ? 'orbiter' : r < 0.9 ? 'tank' : 'shielder';
+      // Wave 11-14: Warden joins, Hunter more common
+      kind = r < 0.12 ? 'drifter' : r < 0.32 ? 'zoomer' : r < 0.48 ? 'splitter' : r < 0.64 ? 'orbiter' : r < 0.78 ? 'hunter' : r < 0.92 ? 'tank' : 'warden';
+    } else if (n <= 19) {
+      // Wave 15-19: Colossus starts appearing; hunters + wardens common
+      kind = r < 0.08 ? 'drifter' : r < 0.25 ? 'zoomer' : r < 0.42 ? 'splitter' : r < 0.55 ? 'orbiter' : r < 0.72 ? 'hunter' : r < 0.85 ? 'tank' : r < 0.95 ? 'warden' : 'colossus';
     } else {
-      // Wave 15+: heavy mix, shielders more common
-      kind = r < 0.12 ? 'drifter' : r < 0.3 ? 'zoomer' : r < 0.48 ? 'splitter' : r < 0.68 ? 'orbiter' : r < 0.85 ? 'tank' : 'shielder';
+      // Wave 20+: heavy mix of chasers, colossus more common
+      kind = r < 0.05 ? 'drifter' : r < 0.18 ? 'zoomer' : r < 0.32 ? 'splitter' : r < 0.42 ? 'orbiter' : r < 0.6 ? 'hunter' : r < 0.75 ? 'tank' : r < 0.9 ? 'warden' : 'colossus';
     }
     q.push({ kind, delay: rand(minDelay, maxDelay) });
   }
@@ -1481,6 +1548,11 @@ function updateWave(dt) {
     state.betweenWaves = true;
     const N = state.wave;
     state.score += 25;                          // tiny flat clear bonus
+    // Persistent progression: remember the highest wave the player has cleared
+    if (N > state.highestWaveCleared) {
+      state.highestWaveCleared = N;
+      localStorage.setItem('gs_highest_wave', String(N));
+    }
     addFloatText(state.w / 2, state.h / 2 - 20, `WAVE ${N} CLEAR`, '#fff85d');
     state.mathNextWave = N + 1;
     setTimeout(() => { if (state.mode !== 'gameover') openMathGate(); }, 900);
@@ -1892,7 +1964,8 @@ function startGame() {
   buildLivesHud();
   updatePowerupHud();
   updateCoinHud();
-  startWave(1);
+  const w = Math.max(1, state.startWave || 1);
+  startWave(w);
 }
 
 function togglePause() {
@@ -1967,6 +2040,33 @@ function updateTitleStats() {
   document.querySelectorAll('.grade-pill').forEach(p => {
     p.classList.toggle('active', p.dataset.grade === state.mathGrade);
   });
+  renderWaveChips();
+}
+
+// Wave-checkpoint picker: chips at every 5 waves up through the highest
+// wave the player has cleared, plus wave 1 as an always-available start.
+function renderWaveChips() {
+  const wrap = document.getElementById('wave-chips');
+  if (!wrap) return;
+  const highest = state.highestWaveCleared || 0;
+  const checkpoints = [1];
+  for (let n = 5; n <= Math.max(5, highest); n += 5) checkpoints.push(n);
+  if (highest > 1 && highest % 5 !== 0 && !checkpoints.includes(highest)) checkpoints.push(highest);
+  // If the current startWave isn't among the unlocked checkpoints,
+  // snap to the highest one so the picker always shows the best default.
+  if (!checkpoints.includes(state.startWave)) {
+    state.startWave = checkpoints[checkpoints.length - 1];
+  }
+  wrap.innerHTML = '';
+  for (const n of checkpoints) {
+    const b = document.createElement('button');
+    b.className = 'wave-chip' + (n === state.startWave ? ' active' : '');
+    b.textContent = `Wave ${n}`;
+    b.setAttribute('ontouchstart', '');
+    b.addEventListener('click', () => { state.startWave = n; renderWaveChips(); });
+    b.addEventListener('touchend', (e) => { e.preventDefault(); state.startWave = n; renderWaveChips(); }, { passive: false });
+    wrap.appendChild(b);
+  }
 }
 
 // ---------- Shop ----------
@@ -2063,13 +2163,15 @@ function renderShop() {
 // Enemy guide — list every enemy kind with a tiny preview and the
 // wave they start showing up. Mirrors what buildWave actually does.
 const ENEMY_GUIDE = [
-  { kind: 'drifter',  name: 'Drifter',  when: 'Wave 1+',  desc: 'Slow pink chaser. 1 HP. The easiest enemy.' },
+  { kind: 'drifter',  name: 'Drifter',  when: 'Wave 1+',  desc: 'Slow pink chaser. 2 HP. The easiest enemy.' },
   { kind: 'zoomer',   name: 'Zoomer',   when: 'Wave 1+',  desc: 'Fast yellow triangle that commits to a direct dash. 1 HP.' },
-  { kind: 'splitter', name: 'Splitter', when: 'Wave 3+',  desc: 'Green square. 2 HP. Splits into two small drifters when killed.' },
-  { kind: 'orbiter',  name: 'Orbiter',  when: 'Wave 5+',  desc: 'Cyan circle that orbits you at distance and shoots at you. 2 HP.' },
-  { kind: 'tank',     name: 'Tank',     when: 'Wave 7+',  desc: 'Slow red octagon. 4 HP. Brings everyone else to a halt if you ignore it.' },
-  { kind: 'shielder', name: 'Shielder', when: 'Wave 11+', desc: 'Purple octagon. 6 HP. Slower than tank but tougher.' },
-  { kind: 'boss',     name: 'Boss',     when: 'Wave 5, 10, 15, 20…', desc: 'Big star. Heaps of HP, radial barrages, escorts. Faster fire on higher waves.' },
+  { kind: 'splitter', name: 'Splitter', when: 'Wave 3+',  desc: 'Green square. 3 HP. Splits into two small drifters when killed.' },
+  { kind: 'orbiter',  name: 'Orbiter',  when: 'Wave 5+',  desc: 'Cyan circle that orbits you at distance and shoots at you. 3 HP.' },
+  { kind: 'tank',     name: 'Tank',     when: 'Wave 7+',  desc: 'Slow red octagon. 7 HP. Brings everyone else to a halt if you ignore it.' },
+  { kind: 'hunter',   name: 'Hunter',   when: 'Wave 8+',  desc: 'Fast red triangle that AGGRESSIVELY chases and periodically dashes at you. 8 HP.' },
+  { kind: 'warden',   name: 'Warden',   when: 'Wave 12+', desc: 'Bulky green square that chases and BURSTS into 3 zoomers on death. 18 HP.' },
+  { kind: 'colossus', name: 'Colossus', when: 'Wave 15+', desc: 'Massive gold hexagon. Slow but unstoppable — it just walks straight at you. 40 HP.' },
+  { kind: 'boss',     name: 'Boss',     when: 'Wave 5, 10, 15, 20…', desc: 'Big star. Heaps of HP, radial barrages, tough escorts. Faster fire on higher waves.' },
 ];
 
 function renderEnemyGuide() {
@@ -2085,6 +2187,15 @@ function renderEnemyGuide() {
       <div class="desc">${row.desc}</div>`;
     wrap.appendChild(card);
   }
+  // Elite explainer card
+  const el = document.createElement('div');
+  el.className = 'enemy-card';
+  el.innerHTML = `
+    <canvas data-kind="hunter"></canvas>
+    <div class="name">⭐ Elite Variants</div>
+    <div class="when">Wave 10+ (rare)</div>
+    <div class="desc">Any enemy can spawn as an elite — 3× HP, faster, bigger, and drops double coins. Look for the white pulsing ring.</div>`;
+  wrap.appendChild(el);
   // Mini-boss card (composite — not a single kind)
   const mb = document.createElement('div');
   mb.className = 'enemy-card';
@@ -2120,7 +2231,10 @@ function drawEnemyPreview(canvas, kind) {
   c.shadowColor = k.color;
   c.shadowBlur = 14;
   c.lineWidth = 2.2;
-  const r = (kind === 'boss') ? 22 : (kind === 'tank' || kind === 'shielder') ? 19 : 17;
+  const r = (kind === 'boss') ? 22
+          : (kind === 'colossus') ? 24
+          : (kind === 'tank' || kind === 'warden') ? 20
+          : 17;
   if (k.shape === 'circle') {
     c.beginPath(); c.arc(0, 0, r, 0, TAU); c.stroke();
     c.beginPath(); c.arc(0, 0, r * 0.55, 0, TAU); c.stroke();
