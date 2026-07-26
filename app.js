@@ -1543,19 +1543,32 @@ function updateWave(dt) {
     }
   }
   if (state.spawnQueue.length === 0 && state.enemies.length === 0 && !state.betweenWaves) {
-    // Wave clear — open the math gate. Next wave only starts after the
-    // player solves (or skips) a grade-appropriate math problem.
+    // Wave clear → shop, then level select.  (George: "once you finish a
+    // level, it takes you to the shop, and when you press start you can
+    // choose which level to do".)
     state.betweenWaves = true;
     const N = state.wave;
-    state.score += 25;                          // tiny flat clear bonus
-    // Persistent progression: remember the highest wave the player has cleared
+    state.score += 25;
     if (N > state.highestWaveCleared) {
       state.highestWaveCleared = N;
       localStorage.setItem('gs_highest_wave', String(N));
     }
     addFloatText(state.w / 2, state.h / 2 - 20, `WAVE ${N} CLEAR`, '#fff85d');
-    state.mathNextWave = N + 1;
-    setTimeout(() => { if (state.mode !== 'gameover') openMathGate(); }, 900);
+    // Also bank the run's coin haul now so the shop actually has spending
+    // money in it — otherwise you'd stare at an empty wallet mid-run.
+    if (state.runCoins > 0) {
+      state.coins += state.runCoins;
+      state.runCoins = 0;
+      saveCoins();
+    }
+    setTimeout(() => {
+      if (state.mode === 'gameover') return;
+      // Hide the gameplay HUD before opening the shop overlay so the
+      // shop's sticky wallet header isn't fighting the SCORE/WAVE row.
+      document.getElementById('hud').classList.add('hidden');
+      state.mode = 'paused';   // freeze rAF gameplay updates
+      openShop('wave-clear');
+    }, 900);
   }
 }
 
@@ -2049,24 +2062,37 @@ function renderWaveChips() {
   const wrap = document.getElementById('wave-chips');
   if (!wrap) return;
   const highest = state.highestWaveCleared || 0;
-  const checkpoints = [1];
-  for (let n = 5; n <= Math.max(5, highest); n += 5) checkpoints.push(n);
-  if (highest > 1 && highest % 5 !== 0 && !checkpoints.includes(highest)) checkpoints.push(highest);
-  // If the current startWave isn't among the unlocked checkpoints,
-  // snap to the highest one so the picker always shows the best default.
-  if (!checkpoints.includes(state.startWave)) {
-    state.startWave = checkpoints[checkpoints.length - 1];
+  const maxUnlocked = highest + 1;             // George: can play the next un-cleared level too
+  const previewLocked = 6;                     // show a few locked ahead so you see what's coming
+  const total = maxUnlocked + previewLocked;
+  // Default selection: highest unlocked (= maxUnlocked)
+  if (!state.startWave || state.startWave > maxUnlocked) {
+    state.startWave = maxUnlocked;
   }
   wrap.innerHTML = '';
-  for (const n of checkpoints) {
+  for (let n = 1; n <= total; n++) {
     const b = document.createElement('button');
-    b.className = 'wave-chip' + (n === state.startWave ? ' active' : '');
-    b.textContent = `Wave ${n}`;
+    const locked = n > maxUnlocked;
+    const isActive = n === state.startWave;
+    b.className = 'wave-chip' + (isActive ? ' active' : '') + (locked ? ' locked' : '');
+    b.textContent = locked ? `🔒 ${n}` : `${n}`;
     b.setAttribute('ontouchstart', '');
-    b.addEventListener('click', () => { state.startWave = n; renderWaveChips(); });
-    b.addEventListener('touchend', (e) => { e.preventDefault(); state.startWave = n; renderWaveChips(); }, { passive: false });
+    if (!locked) {
+      b.addEventListener('click', () => { state.startWave = n; renderWaveChips(); });
+      b.addEventListener('touchend', (e) => { e.preventDefault(); state.startWave = n; renderWaveChips(); }, { passive: false });
+    } else {
+      b.setAttribute('aria-disabled', 'true');
+      b.title = `Clear wave ${n - 1} first`;
+    }
     wrap.appendChild(b);
   }
+  // Scroll the active chip into view (horizontal scroll)
+  requestAnimationFrame(() => {
+    const active = wrap.querySelector('.wave-chip.active');
+    if (active && active.scrollIntoView) {
+      try { active.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'auto' }); } catch (e) {}
+    }
+  });
 }
 
 // ---------- Shop ----------
@@ -2082,6 +2108,14 @@ function closeShop() {
   document.getElementById('shop').classList.add('hidden');
   if (shopReturn === 'gameover') {
     document.getElementById('gameover').classList.remove('hidden');
+  } else if (shopReturn === 'wave-clear') {
+    // Wave-clear → shop → level select (title).  Snap the wave picker
+    // default to the next unlocked wave so the CTA is obviously "keep going".
+    const next = (state.highestWaveCleared || 0) + 1;
+    state.startWave = next;
+    state.mode = 'title';
+    document.getElementById('title').classList.remove('hidden');
+    updateTitleStats();
   } else {
     document.getElementById('title').classList.remove('hidden');
     updateTitleStats();
