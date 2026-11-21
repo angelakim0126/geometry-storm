@@ -260,7 +260,7 @@ function closeMathGate(/* solved */) {
 
 // Vertex-side count per enemy shape (used for the "weak point" bonus).
 // Orbiter is a circle — no vertices, no bonus.
-const SHAPE_SIDES = { tri: 3, sq: 4, hex: 6, octa: 8, star: 10 };
+const SHAPE_SIDES = { tri: 3, sq: 4, diamond: 4, star4: 4, cross: 4, pent: 5, hex: 6, hept: 7, octa: 8, star: 10 };
 
 const MILESTONES = {
   5:  'ASTEROID BELT',
@@ -325,18 +325,48 @@ const UPGRADE_DEFS = {
   damage:   { name: 'Damage',    icon: '💥', max: 5, costs: [100, 200, 400, 800, 1600], per: '+1 bullet damage' },
 };
 
+// Ships get strictly better as they get pricier (George: "make the good
+// ones actually good").  Expensive ships STACK: bigger base stats, more
+// shots per volley, AND several bullet effects at once.
+//   shots:  1 single · 2 twin (parallel) · 3 triple spread · 5 fan
+//   fx:     slow · explode · fire · homing (flags) · pierce / chain (counts)
+//   drones: little helper ships that orbit you and fire on their own
 const SHIPS = {
-  scout:   { name: 'Scout',   icon: '🛸', cost: 0,    color: '#7df9ff', desc: 'Balanced starter.',                  mods: {} },
-  striker: { name: 'Striker', icon: '⚔️', cost: 500,  color: '#fff85d', desc: '+30% fire rate · −1 starting life.', mods: { fireMul: 0.7, livesAdd: -1 } },
-  titan:   { name: 'Titan',   icon: '🛡️', cost: 1200, color: '#6ee7b7', desc: '+2 lives · −15% speed.',             mods: { livesAdd: 2, speedMul: 0.85 } },
-  crystal: { name: 'Crystal', icon: '💎', cost: 2200, color: '#ff5dd2', desc: '+1 base damage · −20% fire rate.',   mods: { dmgAdd: 1, fireMul: 1.2 } },
-  phantom: { name: 'Phantom', icon: '🌟', cost: 3500, color: '#fa5400', desc: 'Smaller hitbox · +25% speed.',       mods: { hitboxMul: 0.7, speedMul: 1.25 } },
-  vortex:  { name: 'Vortex',  icon: '🌀', cost: 4500, color: '#c084fc', desc: 'Shots briefly slow enemies they hit.',mods: { bulletEffect: 'slow' } },
-  comet:   { name: 'Comet',   icon: '☄️', cost: 6500, color: '#ff8c42', desc: 'Bullets explode on impact (small AoE).', mods: { bulletEffect: 'explode' } },
-  trident: { name: 'Trident', icon: '🔱', cost: 9000, color: '#5ee3e0', desc: 'Always triple-shot · −25% fire rate.',  mods: { fireMul: 1.25, alwaysTriple: true } },
-  inferno: { name: 'Inferno', icon: '🔥', cost: 12000, color: '#ff6b35', desc: 'Bullets ignite enemies for damage-over-time.', mods: { bulletEffect: 'fire' } },
-  photon:  { name: 'Photon',  icon: '✨', cost: 16000, color: '#b794f6', desc: 'Bullets pierce through up to 2 extra enemies.', mods: { bulletEffect: 'pierce' } },
-  voltage: { name: 'Voltage', icon: '⚡', cost: 22000, color: '#fbbf24', desc: 'Kills chain damage to the nearest enemy within range.', mods: { bulletEffect: 'chain' } },
+  scout:   { name: 'Scout',   icon: '🛸', cost: 0,     color: '#7df9ff', desc: 'Balanced starter.',
+             mods: {} },
+  striker: { name: 'Striker', icon: '⚔️', cost: 500,   color: '#fff85d', desc: '+20% fire rate, but −1 life.',
+             mods: { fireMul: 0.83, livesAdd: -1 } },
+  titan:   { name: 'Titan',   icon: '🛡️', cost: 1200,  color: '#6ee7b7', desc: 'Tanky: +2 lives, a bit slower.',
+             mods: { livesAdd: 2, speedMul: 0.85 } },
+  crystal: { name: 'Crystal', icon: '💎', cost: 2200,  color: '#ff5dd2', desc: '+1 damage on every shot.',
+             mods: { dmgAdd: 1 } },
+  phantom: { name: 'Phantom', icon: '🌟', cost: 3500,  color: '#fa5400', desc: 'Tiny hitbox, fast, +1 damage.',
+             mods: { dmgAdd: 1, hitboxMul: 0.7, speedMul: 1.2, fireMul: 0.92 } },
+  vortex:  { name: 'Vortex',  icon: '🌀', cost: 4500,  color: '#c084fc', desc: 'Shots freeze-slow enemies. +1 dmg, +1 life.',
+             mods: { dmgAdd: 1, livesAdd: 1, fx: { slow: true } } },
+  comet:   { name: 'Comet',   icon: '☄️', cost: 6500,  color: '#ff8c42', desc: 'Twin shots that EXPLODE. +1 dmg.',
+             mods: { dmgAdd: 1, shots: 2, fx: { explode: true } } },
+  trident: { name: 'Trident', icon: '🔱', cost: 9000,  color: '#5ee3e0', desc: 'Always triple shot. +1 dmg, +1 life.',
+             mods: { dmgAdd: 1, livesAdd: 1, shots: 3 } },
+  inferno: { name: 'Inferno', icon: '🔥', cost: 12000, color: '#ff6b35', desc: 'Triple FLAMING shots that burn. +2 dmg.',
+             mods: { dmgAdd: 2, shots: 3, fireMul: 0.9, fx: { fire: true } } },
+  photon:  { name: 'Photon',  icon: '✨', cost: 16000, color: '#b794f6', desc: 'Triple shots pierce 3 enemies + slow. +2 dmg.',
+             mods: { dmgAdd: 2, livesAdd: 1, shots: 3, fireMul: 0.85, fx: { pierce: 3, slow: true } } },
+  voltage: { name: 'Voltage', icon: '⚡', cost: 22000, color: '#fbbf24', desc: 'Every hit zaps lightning to 2 more enemies. +2 dmg.',
+             mods: { dmgAdd: 2, livesAdd: 1, shots: 3, fireMul: 0.8, fx: { chain: 2, pierce: 1 } } },
+  seeker:  { name: 'Seeker',  icon: '🎯', cost: 28000, color: '#34d399', desc: 'HOMING flaming shots + a helper drone. +3 dmg.',
+             mods: { dmgAdd: 3, livesAdd: 1, shots: 3, fireMul: 0.8, drones: 1, fx: { homing: true, fire: true } } },
+  nova:    { name: 'Nova',    icon: '💫', cost: 36000, color: '#f472b6', desc: '5-shot fan of burning explosions + 2 drones. +3 dmg.',
+             mods: { dmgAdd: 3, livesAdd: 2, shots: 5, fireMul: 0.8, drones: 2, fx: { explode: true, fire: true } } },
+  eclipse: { name: 'Eclipse', icon: '🌑', cost: 48000, color: '#e2e8f0', desc: 'Homing, piercing, chain-lightning 5-shot fan + 2 drones. +4 dmg.',
+             mods: { dmgAdd: 4, livesAdd: 2, shots: 5, fireMul: 0.75, speedMul: 1.1, drones: 2, fx: { homing: true, pierce: 3, chain: 2, slow: true } } },
+  omega:   { name: 'Omega',   icon: '👑', cost: 65000, color: '#ffd700', desc: 'THE ULTIMATE SHIP. Every effect at once + 4 drones. +5 dmg.',
+             mods: { dmgAdd: 5, livesAdd: 3, shots: 5, fireMul: 0.7, speedMul: 1.15, hitboxMul: 0.8, drones: 4,
+                     fx: { homing: true, explode: true, fire: true, slow: true, pierce: 3, chain: 3 } } },
+};
+
+const FX_LABELS = {
+  slow: '❄ Slow', explode: '💥 Explode', fire: '🔥 Burn', homing: '🎯 Homing', pierce: '✨ Pierce', chain: '⚡ Chain',
 };
 
 function loadUpgrades() {
@@ -442,9 +472,14 @@ const isTouch = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in win
 if (isTouch) document.getElementById('touch').classList.remove('hidden');
 
 function setupStick(zoneId, stickId, knobId, onChange) {
-  const zone = document.getElementById(zoneId);
+  // The zones are marked up with a CLASS (.stick-zone-left), not an id.
+  // Looking them up by id returned null and threw here on every touch
+  // device — which killed the rest of this script, so START never got
+  // wired up on iPad.  Look up by class, and bail safely if anything's missing.
+  const zone = document.getElementById(zoneId) || document.querySelector('.' + zoneId);
   const stick = document.getElementById(stickId);
   const knob = document.getElementById(knobId);
+  if (!zone || !stick || !knob) return;
   let active = null;
   const RADIUS = 60;
 
@@ -503,7 +538,15 @@ if (isTouch) {
 }
 
 // ---------- Particles ----------
+// Particle budget so big ships + big fights stay smooth on iPad.
+const MAX_PARTICLES = 900;
+function pushParticle(p) {
+  if (state.particles.length < MAX_PARTICLES) state.particles.push(p);
+}
+
 function spawnParticles(x, y, color, n = 12, speed = 4, life = 600) {
+  if (state.particles.length > MAX_PARTICLES * 0.7) n = Math.min(n, 3);
+  if (state.particles.length >= MAX_PARTICLES) return;
   for (let i = 0; i < n; i++) {
     const a = rand(0, TAU);
     const s = rand(speed * 0.3, speed);
@@ -528,16 +571,16 @@ function updateParticles(dt) {
 }
 
 // ---------- Player ----------
-function computeLoadout() {
+function computeLoadout(shipId) {
   // Combine upgrades + ship modifiers into the per-run stats the player uses.
   const u = state.upgrades;
-  const ship = SHIPS[state.ship] || SHIPS.scout;
+  const ship = SHIPS[shipId || state.ship] || SHIPS.scout;
   const mods = ship.mods || {};
   // Defensive: avoid `??` so older iOS Safari (< 13.4) can still parse this
   // file.  If parsing fails, the whole script dies and the START button
   // never binds — exactly the symptom we keep hitting on iPads.
   const def = (v, d) => (v === undefined || v === null) ? d : v;
-  const fireRate = Math.max(50, (CFG.player.fireRate - u.fireRate * 15) * def(mods.fireMul, 1));
+  const fireRate = Math.max(55, (CFG.player.fireRate - u.fireRate * 15) * def(mods.fireMul, 1));
   const maxSpeed = (CFG.player.maxSpeed + u.speed * 0.4) * def(mods.speedMul, 1);
   const lives = Math.max(1, 3 + u.hull + def(mods.livesAdd, 0));
   const bulletDmg = 1 + u.damage + def(mods.dmgAdd, 0);
@@ -545,8 +588,9 @@ function computeLoadout() {
   return {
     fireRate, maxSpeed, lives, bulletDmg, hitboxMul,
     color: ship.color,
-    bulletEffect: mods.bulletEffect || null,    // 'slow' | 'explode' | null
-    alwaysTriple: !!mods.alwaysTriple,
+    shots: def(mods.shots, 1),
+    fx: mods.fx || null,
+    drones: def(mods.drones, 0),
   };
 }
 
@@ -566,8 +610,10 @@ function makePlayer() {
     maxSpeed: lo.maxSpeed,
     bulletDmg: lo.bulletDmg,
     color: lo.color,
-    bulletEffect: lo.bulletEffect,
-    alwaysTriple: lo.alwaysTriple,
+    shots: lo.shots,
+    fx: lo.fx,
+    drones: lo.drones,
+    droneFire: 0,
   };
 }
 
@@ -575,228 +621,316 @@ function makePlayer() {
 // `r` is the visual radius — kept constant across ships so the hitbox
 // change on Phantom doesn't shrink the rendered ship.
 const SHIP_DRAW = {
-  scout(r) {
+  scout(c, r) {
     // Sleek fighter: pointed nose, swept-back wings, central cockpit
-    ctx.beginPath();
-    ctx.moveTo(r * 1.25, 0);
-    ctx.lineTo(r * 0.25, -r * 0.4);
-    ctx.lineTo(-r * 0.15, -r * 0.95);
-    ctx.lineTo(-r * 0.75, -r * 0.55);
-    ctx.lineTo(-r * 0.5,  -r * 0.18);
-    ctx.lineTo(-r * 0.8, 0);
-    ctx.lineTo(-r * 0.5,   r * 0.18);
-    ctx.lineTo(-r * 0.75,  r * 0.55);
-    ctx.lineTo(-r * 0.15,  r * 0.95);
-    ctx.lineTo(r * 0.25,   r * 0.4);
-    ctx.closePath();
-    ctx.stroke();
+    c.beginPath();
+    c.moveTo(r * 1.25, 0);
+    c.lineTo(r * 0.25, -r * 0.4);
+    c.lineTo(-r * 0.15, -r * 0.95);
+    c.lineTo(-r * 0.75, -r * 0.55);
+    c.lineTo(-r * 0.5,  -r * 0.18);
+    c.lineTo(-r * 0.8, 0);
+    c.lineTo(-r * 0.5,   r * 0.18);
+    c.lineTo(-r * 0.75,  r * 0.55);
+    c.lineTo(-r * 0.15,  r * 0.95);
+    c.lineTo(r * 0.25,   r * 0.4);
+    c.closePath();
+    c.stroke();
     // Cockpit bubble
-    ctx.beginPath();
-    ctx.arc(r * 0.35, 0, r * 0.22, 0, TAU);
-    ctx.stroke();
+    c.beginPath();
+    c.arc(r * 0.35, 0, r * 0.22, 0, TAU);
+    c.stroke();
   },
-  striker(r) {
+  striker(c, r) {
     // Aggressive: long body + forward-swept wings + twin barrels
-    ctx.beginPath();
-    ctx.moveTo(r * 1.35, 0);
-    ctx.lineTo(r * 0.5, -r * 0.3);
-    ctx.lineTo(r * 0.7, -r * 0.95);
-    ctx.lineTo(-r * 0.15, -r * 0.95);
-    ctx.lineTo(-r * 0.4, -r * 0.45);
-    ctx.lineTo(-r * 0.85, -r * 0.55);
-    ctx.lineTo(-r * 0.95, 0);
-    ctx.lineTo(-r * 0.85,  r * 0.55);
-    ctx.lineTo(-r * 0.4,   r * 0.45);
-    ctx.lineTo(-r * 0.15,  r * 0.95);
-    ctx.lineTo(r * 0.7,    r * 0.95);
-    ctx.lineTo(r * 0.5,    r * 0.3);
-    ctx.closePath();
-    ctx.stroke();
+    c.beginPath();
+    c.moveTo(r * 1.35, 0);
+    c.lineTo(r * 0.5, -r * 0.3);
+    c.lineTo(r * 0.7, -r * 0.95);
+    c.lineTo(-r * 0.15, -r * 0.95);
+    c.lineTo(-r * 0.4, -r * 0.45);
+    c.lineTo(-r * 0.85, -r * 0.55);
+    c.lineTo(-r * 0.95, 0);
+    c.lineTo(-r * 0.85,  r * 0.55);
+    c.lineTo(-r * 0.4,   r * 0.45);
+    c.lineTo(-r * 0.15,  r * 0.95);
+    c.lineTo(r * 0.7,    r * 0.95);
+    c.lineTo(r * 0.5,    r * 0.3);
+    c.closePath();
+    c.stroke();
     // Twin gun barrels extending past the wings
-    ctx.beginPath();
-    ctx.moveTo(r * 0.7, -r * 0.75); ctx.lineTo(r * 1.15, -r * 0.6);
-    ctx.moveTo(r * 0.7,  r * 0.75); ctx.lineTo(r * 1.15,  r * 0.6);
-    ctx.stroke();
+    c.beginPath();
+    c.moveTo(r * 0.7, -r * 0.75); c.lineTo(r * 1.15, -r * 0.6);
+    c.moveTo(r * 0.7,  r * 0.75); c.lineTo(r * 1.15,  r * 0.6);
+    c.stroke();
   },
-  titan(r) {
+  titan(c, r) {
     // Bulky armored hex-front cruiser
-    ctx.beginPath();
-    ctx.moveTo(r * 1.15, 0);
-    ctx.lineTo(r * 0.85, -r * 0.55);
-    ctx.lineTo(r * 0.2, -r * 1.05);
-    ctx.lineTo(-r * 0.55, -r * 1.05);
-    ctx.lineTo(-r * 0.95, -r * 0.55);
-    ctx.lineTo(-r * 0.95,  r * 0.55);
-    ctx.lineTo(-r * 0.55,  r * 1.05);
-    ctx.lineTo(r * 0.2,   r * 1.05);
-    ctx.lineTo(r * 0.85,  r * 0.55);
-    ctx.closePath();
-    ctx.stroke();
+    c.beginPath();
+    c.moveTo(r * 1.15, 0);
+    c.lineTo(r * 0.85, -r * 0.55);
+    c.lineTo(r * 0.2, -r * 1.05);
+    c.lineTo(-r * 0.55, -r * 1.05);
+    c.lineTo(-r * 0.95, -r * 0.55);
+    c.lineTo(-r * 0.95,  r * 0.55);
+    c.lineTo(-r * 0.55,  r * 1.05);
+    c.lineTo(r * 0.2,   r * 1.05);
+    c.lineTo(r * 0.85,  r * 0.55);
+    c.closePath();
+    c.stroke();
     // Shield ridge across the prow
-    ctx.beginPath();
-    ctx.moveTo(r * 0.55, -r * 0.55);
-    ctx.lineTo(r * 0.95, 0);
-    ctx.lineTo(r * 0.55,  r * 0.55);
-    ctx.stroke();
+    c.beginPath();
+    c.moveTo(r * 0.55, -r * 0.55);
+    c.lineTo(r * 0.95, 0);
+    c.lineTo(r * 0.55,  r * 0.55);
+    c.stroke();
     // Rear engine block lines
-    ctx.beginPath();
-    ctx.moveTo(-r * 0.95, -r * 0.3); ctx.lineTo(-r * 0.6, -r * 0.3);
-    ctx.moveTo(-r * 0.95,  r * 0.3); ctx.lineTo(-r * 0.6,  r * 0.3);
-    ctx.stroke();
+    c.beginPath();
+    c.moveTo(-r * 0.95, -r * 0.3); c.lineTo(-r * 0.6, -r * 0.3);
+    c.moveTo(-r * 0.95,  r * 0.3); c.lineTo(-r * 0.6,  r * 0.3);
+    c.stroke();
   },
-  crystal(r) {
+  crystal(c, r) {
     // Faceted kite/diamond
-    ctx.beginPath();
-    ctx.moveTo(r * 1.35, 0);
-    ctx.lineTo(r * 0.3, -r * 0.85);
-    ctx.lineTo(-r * 0.85, -r * 0.5);
-    ctx.lineTo(-r * 0.55, 0);
-    ctx.lineTo(-r * 0.85,  r * 0.5);
-    ctx.lineTo(r * 0.3,    r * 0.85);
-    ctx.closePath();
-    ctx.stroke();
+    c.beginPath();
+    c.moveTo(r * 1.35, 0);
+    c.lineTo(r * 0.3, -r * 0.85);
+    c.lineTo(-r * 0.85, -r * 0.5);
+    c.lineTo(-r * 0.55, 0);
+    c.lineTo(-r * 0.85,  r * 0.5);
+    c.lineTo(r * 0.3,    r * 0.85);
+    c.closePath();
+    c.stroke();
     // Inner facet lines
-    ctx.beginPath();
-    ctx.moveTo(r * 1.35, 0); ctx.lineTo(-r * 0.55, 0);
-    ctx.moveTo(r * 0.3, -r * 0.85); ctx.lineTo(r * 0.3,  r * 0.85);
-    ctx.stroke();
+    c.beginPath();
+    c.moveTo(r * 1.35, 0); c.lineTo(-r * 0.55, 0);
+    c.moveTo(r * 0.3, -r * 0.85); c.lineTo(r * 0.3,  r * 0.85);
+    c.stroke();
   },
-  phantom(r) {
+  phantom(c, r) {
     // Sleek stealth — long swept wings + small canopy
-    ctx.beginPath();
-    ctx.moveTo(r * 1.5, 0);
-    ctx.lineTo(r * 0.4, -r * 0.22);
-    ctx.lineTo(r * 0.05, -r * 1.0);
-    ctx.lineTo(-r * 0.6, -r * 0.55);
-    ctx.lineTo(-r * 0.85, -r * 0.18);
-    ctx.lineTo(-r * 0.7, 0);
-    ctx.lineTo(-r * 0.85,  r * 0.18);
-    ctx.lineTo(-r * 0.6,   r * 0.55);
-    ctx.lineTo(r * 0.05,   r * 1.0);
-    ctx.lineTo(r * 0.4,    r * 0.22);
-    ctx.closePath();
-    ctx.stroke();
+    c.beginPath();
+    c.moveTo(r * 1.5, 0);
+    c.lineTo(r * 0.4, -r * 0.22);
+    c.lineTo(r * 0.05, -r * 1.0);
+    c.lineTo(-r * 0.6, -r * 0.55);
+    c.lineTo(-r * 0.85, -r * 0.18);
+    c.lineTo(-r * 0.7, 0);
+    c.lineTo(-r * 0.85,  r * 0.18);
+    c.lineTo(-r * 0.6,   r * 0.55);
+    c.lineTo(r * 0.05,   r * 1.0);
+    c.lineTo(r * 0.4,    r * 0.22);
+    c.closePath();
+    c.stroke();
     // Canopy + center fin
-    ctx.beginPath();
-    ctx.arc(r * 0.7, 0, r * 0.14, 0, TAU);
-    ctx.moveTo(r * 0.3, 0); ctx.lineTo(-r * 0.55, 0);
-    ctx.stroke();
+    c.beginPath();
+    c.arc(r * 0.7, 0, r * 0.14, 0, TAU);
+    c.moveTo(r * 0.3, 0); c.lineTo(-r * 0.55, 0);
+    c.stroke();
   },
-  vortex(r) {
+  vortex(c, r) {
     // Crescent / sickle — outer arc curving around a central core
-    ctx.beginPath();
-    ctx.arc(0, 0, r * 1.05, -Math.PI * 0.65, Math.PI * 0.65, false);
-    ctx.lineTo(r * 0.35, 0);
-    ctx.arc(0, 0, r * 0.55, Math.PI * 0.65, -Math.PI * 0.65, true);
-    ctx.closePath();
-    ctx.stroke();
+    c.beginPath();
+    c.arc(0, 0, r * 1.05, -Math.PI * 0.65, Math.PI * 0.65, false);
+    c.lineTo(r * 0.35, 0);
+    c.arc(0, 0, r * 0.55, Math.PI * 0.65, -Math.PI * 0.65, true);
+    c.closePath();
+    c.stroke();
     // Central core + small inner orbit ring
-    ctx.beginPath();
-    ctx.arc(0, 0, r * 0.22, 0, TAU);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.arc(0, 0, r * 0.42, -Math.PI * 0.3, Math.PI * 0.3);
-    ctx.stroke();
+    c.beginPath();
+    c.arc(0, 0, r * 0.22, 0, TAU);
+    c.stroke();
+    c.beginPath();
+    c.arc(0, 0, r * 0.42, -Math.PI * 0.3, Math.PI * 0.3);
+    c.stroke();
   },
-  comet(r) {
+  comet(c, r) {
     // Compact teardrop with twin curved fins — looks like a missile
-    ctx.beginPath();
-    ctx.moveTo(r * 1.4, 0);
-    ctx.bezierCurveTo(r * 0.9, -r * 0.55, r * 0.0, -r * 0.5, -r * 0.7, -r * 0.3);
-    ctx.lineTo(-r * 0.85, 0);
-    ctx.lineTo(-r * 0.7, r * 0.3);
-    ctx.bezierCurveTo(r * 0.0, r * 0.5, r * 0.9, r * 0.55, r * 1.4, 0);
-    ctx.closePath();
-    ctx.stroke();
+    c.beginPath();
+    c.moveTo(r * 1.4, 0);
+    c.bezierCurveTo(r * 0.9, -r * 0.55, r * 0.0, -r * 0.5, -r * 0.7, -r * 0.3);
+    c.lineTo(-r * 0.85, 0);
+    c.lineTo(-r * 0.7, r * 0.3);
+    c.bezierCurveTo(r * 0.0, r * 0.5, r * 0.9, r * 0.55, r * 1.4, 0);
+    c.closePath();
+    c.stroke();
     // Curved fins
-    ctx.beginPath();
-    ctx.moveTo(-r * 0.1, -r * 0.45);
-    ctx.quadraticCurveTo(-r * 0.6, -r * 0.95, -r * 0.95, -r * 0.5);
-    ctx.moveTo(-r * 0.1,  r * 0.45);
-    ctx.quadraticCurveTo(-r * 0.6,  r * 0.95, -r * 0.95,  r * 0.5);
-    ctx.stroke();
+    c.beginPath();
+    c.moveTo(-r * 0.1, -r * 0.45);
+    c.quadraticCurveTo(-r * 0.6, -r * 0.95, -r * 0.95, -r * 0.5);
+    c.moveTo(-r * 0.1,  r * 0.45);
+    c.quadraticCurveTo(-r * 0.6,  r * 0.95, -r * 0.95,  r * 0.5);
+    c.stroke();
     // Cockpit dot
-    ctx.beginPath();
-    ctx.arc(r * 0.55, 0, r * 0.13, 0, TAU);
-    ctx.stroke();
+    c.beginPath();
+    c.arc(r * 0.55, 0, r * 0.13, 0, TAU);
+    c.stroke();
   },
-  trident(r) {
+  trident(c, r) {
     // Three-prong forward attack — like a trident
-    ctx.beginPath();
-    ctx.moveTo(r * 1.4, -r * 0.55);          // top prong tip
-    ctx.lineTo(r * 0.5, -r * 0.4);
-    ctx.lineTo(r * 1.4, 0);                  // center prong tip
-    ctx.lineTo(r * 0.5,  r * 0.4);
-    ctx.lineTo(r * 1.4,  r * 0.55);          // bottom prong tip
-    ctx.lineTo(r * 0.35, r * 0.7);           // wing tip lower
-    ctx.lineTo(-r * 0.55, r * 0.6);
-    ctx.lineTo(-r * 0.95, 0);
-    ctx.lineTo(-r * 0.55, -r * 0.6);
-    ctx.lineTo(r * 0.35, -r * 0.7);          // wing tip upper
-    ctx.closePath();
-    ctx.stroke();
+    c.beginPath();
+    c.moveTo(r * 1.4, -r * 0.55);          // top prong tip
+    c.lineTo(r * 0.5, -r * 0.4);
+    c.lineTo(r * 1.4, 0);                  // center prong tip
+    c.lineTo(r * 0.5,  r * 0.4);
+    c.lineTo(r * 1.4,  r * 0.55);          // bottom prong tip
+    c.lineTo(r * 0.35, r * 0.7);           // wing tip lower
+    c.lineTo(-r * 0.55, r * 0.6);
+    c.lineTo(-r * 0.95, 0);
+    c.lineTo(-r * 0.55, -r * 0.6);
+    c.lineTo(r * 0.35, -r * 0.7);          // wing tip upper
+    c.closePath();
+    c.stroke();
     // Central spine
-    ctx.beginPath();
-    ctx.moveTo(r * 0.5, 0); ctx.lineTo(-r * 0.55, 0);
-    ctx.stroke();
+    c.beginPath();
+    c.moveTo(r * 0.5, 0); c.lineTo(-r * 0.55, 0);
+    c.stroke();
   },
-  inferno(r) {
+  inferno(c, r) {
     // Flame-shaped fighter with curved tail tips
-    ctx.beginPath();
-    ctx.moveTo(r * 1.3, 0);
-    ctx.bezierCurveTo(r * 0.7, -r * 0.4, r * 0.2, -r * 0.55, -r * 0.2, -r * 0.85);
-    ctx.lineTo(-r * 0.5, -r * 0.35);
-    ctx.lineTo(-r * 0.85, -r * 0.55);
-    ctx.lineTo(-r * 0.95, 0);
-    ctx.lineTo(-r * 0.85, r * 0.55);
-    ctx.lineTo(-r * 0.5, r * 0.35);
-    ctx.lineTo(-r * 0.2, r * 0.85);
-    ctx.bezierCurveTo(r * 0.2, r * 0.55, r * 0.7, r * 0.4, r * 1.3, 0);
-    ctx.closePath();
-    ctx.stroke();
+    c.beginPath();
+    c.moveTo(r * 1.3, 0);
+    c.bezierCurveTo(r * 0.7, -r * 0.4, r * 0.2, -r * 0.55, -r * 0.2, -r * 0.85);
+    c.lineTo(-r * 0.5, -r * 0.35);
+    c.lineTo(-r * 0.85, -r * 0.55);
+    c.lineTo(-r * 0.95, 0);
+    c.lineTo(-r * 0.85, r * 0.55);
+    c.lineTo(-r * 0.5, r * 0.35);
+    c.lineTo(-r * 0.2, r * 0.85);
+    c.bezierCurveTo(r * 0.2, r * 0.55, r * 0.7, r * 0.4, r * 1.3, 0);
+    c.closePath();
+    c.stroke();
     // Inner flame curl
-    ctx.beginPath();
-    ctx.arc(r * 0.2, 0, r * 0.32, -Math.PI * 0.6, Math.PI * 0.6);
-    ctx.stroke();
+    c.beginPath();
+    c.arc(r * 0.2, 0, r * 0.32, -Math.PI * 0.6, Math.PI * 0.6);
+    c.stroke();
   },
-  photon(r) {
+  photon(c, r) {
     // Prism / crystal-light shape — outer diamond with bright inner beam
-    ctx.beginPath();
-    ctx.moveTo(r * 1.4, 0);
-    ctx.lineTo(r * 0.2, -r * 0.85);
-    ctx.lineTo(-r * 0.85, -r * 0.35);
-    ctx.lineTo(-r * 0.85, r * 0.35);
-    ctx.lineTo(r * 0.2, r * 0.85);
-    ctx.closePath();
-    ctx.stroke();
+    c.beginPath();
+    c.moveTo(r * 1.4, 0);
+    c.lineTo(r * 0.2, -r * 0.85);
+    c.lineTo(-r * 0.85, -r * 0.35);
+    c.lineTo(-r * 0.85, r * 0.35);
+    c.lineTo(r * 0.2, r * 0.85);
+    c.closePath();
+    c.stroke();
     // Inner beam axis + diagonals
-    ctx.beginPath();
-    ctx.moveTo(r * 1.4, 0); ctx.lineTo(-r * 0.85, 0);
-    ctx.moveTo(r * 0.2, -r * 0.85); ctx.lineTo(r * 0.2, r * 0.85);
-    ctx.stroke();
+    c.beginPath();
+    c.moveTo(r * 1.4, 0); c.lineTo(-r * 0.85, 0);
+    c.moveTo(r * 0.2, -r * 0.85); c.lineTo(r * 0.2, r * 0.85);
+    c.stroke();
   },
-  voltage(r) {
+  voltage(c, r) {
     // Jagged lightning-bolt silhouette
-    ctx.beginPath();
-    ctx.moveTo(r * 1.35, -r * 0.05);
-    ctx.lineTo(r * 0.55, -r * 0.6);
-    ctx.lineTo(r * 0.75, -r * 0.15);
-    ctx.lineTo(r * 0.05, -r * 0.85);
-    ctx.lineTo(-r * 0.35, -r * 0.4);
-    ctx.lineTo(-r * 0.85, -r * 0.55);
-    ctx.lineTo(-r * 0.65, 0);
-    ctx.lineTo(-r * 0.85, r * 0.55);
-    ctx.lineTo(-r * 0.35, r * 0.4);
-    ctx.lineTo(r * 0.05, r * 0.85);
-    ctx.lineTo(r * 0.75, r * 0.15);
-    ctx.lineTo(r * 0.55, r * 0.6);
-    ctx.closePath();
-    ctx.stroke();
+    c.beginPath();
+    c.moveTo(r * 1.35, -r * 0.05);
+    c.lineTo(r * 0.55, -r * 0.6);
+    c.lineTo(r * 0.75, -r * 0.15);
+    c.lineTo(r * 0.05, -r * 0.85);
+    c.lineTo(-r * 0.35, -r * 0.4);
+    c.lineTo(-r * 0.85, -r * 0.55);
+    c.lineTo(-r * 0.65, 0);
+    c.lineTo(-r * 0.85, r * 0.55);
+    c.lineTo(-r * 0.35, r * 0.4);
+    c.lineTo(r * 0.05, r * 0.85);
+    c.lineTo(r * 0.75, r * 0.15);
+    c.lineTo(r * 0.55, r * 0.6);
+    c.closePath();
+    c.stroke();
     // Spark in the core
-    ctx.beginPath();
-    ctx.moveTo(r * 0.4, -r * 0.2);
-    ctx.lineTo(-r * 0.2, r * 0.2);
-    ctx.stroke();
+    c.beginPath();
+    c.moveTo(r * 0.4, -r * 0.2);
+    c.lineTo(-r * 0.2, r * 0.2);
+    c.stroke();
+  },
+  seeker(c, r) {
+    // Arrowhead with a targeting reticle
+    c.beginPath();
+    c.moveTo(r * 1.4, 0);
+    c.lineTo(-r * 0.2, -r * 0.9);
+    c.lineTo(-r * 0.6, -r * 0.9);
+    c.lineTo(-r * 0.3, -r * 0.3);
+    c.lineTo(-r * 0.9, 0);
+    c.lineTo(-r * 0.3, r * 0.3);
+    c.lineTo(-r * 0.6, r * 0.9);
+    c.lineTo(-r * 0.2, r * 0.9);
+    c.closePath();
+    c.stroke();
+    c.beginPath();
+    c.arc(r * 0.25, 0, r * 0.28, 0, TAU);
+    c.moveTo(r * 0.25 - r * 0.42, 0); c.lineTo(r * 0.25 + r * 0.42, 0);
+    c.moveTo(r * 0.25, -r * 0.42); c.lineTo(r * 0.25, r * 0.42);
+    c.stroke();
+  },
+  nova(c, r) {
+    // Starburst cruiser: 4 swept blades around a glowing core
+    c.beginPath();
+    c.moveTo(r * 1.45, 0);
+    c.lineTo(r * 0.35, -r * 0.3);
+    c.lineTo(r * 0.3, -r * 1.05);
+    c.lineTo(-r * 0.2, -r * 0.35);
+    c.lineTo(-r * 0.95, -r * 0.55);
+    c.lineTo(-r * 0.55, 0);
+    c.lineTo(-r * 0.95, r * 0.55);
+    c.lineTo(-r * 0.2, r * 0.35);
+    c.lineTo(r * 0.3, r * 1.05);
+    c.lineTo(r * 0.35, r * 0.3);
+    c.closePath();
+    c.stroke();
+    c.beginPath();
+    c.arc(r * 0.05, 0, r * 0.3, 0, TAU);
+    c.stroke();
+    c.beginPath();
+    c.arc(r * 0.05, 0, r * 0.12, 0, TAU);
+    c.stroke();
+  },
+  eclipse(c, r) {
+    // Dark ring with a crescent blade sweeping forward
+    c.beginPath();
+    c.arc(0, 0, r * 0.75, 0, TAU);
+    c.stroke();
+    c.beginPath();
+    c.moveTo(r * 1.45, 0);
+    c.quadraticCurveTo(r * 0.6, -r * 1.25, -r * 0.95, -r * 0.85);
+    c.quadraticCurveTo(-r * 0.2, -r * 0.6, r * 0.55, 0);
+    c.quadraticCurveTo(-r * 0.2, r * 0.6, -r * 0.95, r * 0.85);
+    c.quadraticCurveTo(r * 0.6, r * 1.25, r * 1.45, 0);
+    c.closePath();
+    c.stroke();
+    c.beginPath();
+    c.arc(-r * 0.15, 0, r * 0.22, 0, TAU);
+    c.stroke();
+  },
+  omega(c, r) {
+    // Royal flagship: crown-tipped prow, layered wings, gem core
+    c.beginPath();
+    c.moveTo(r * 1.5, 0);
+    c.lineTo(r * 1.05, -r * 0.25);
+    c.lineTo(r * 1.2, -r * 0.6);
+    c.lineTo(r * 0.6, -r * 0.45);
+    c.lineTo(r * 0.45, -r * 1.1);
+    c.lineTo(-r * 0.25, -r * 0.6);
+    c.lineTo(-r * 1.0, -r * 0.95);
+    c.lineTo(-r * 0.7, -r * 0.25);
+    c.lineTo(-r * 1.0, 0);
+    c.lineTo(-r * 0.7, r * 0.25);
+    c.lineTo(-r * 1.0, r * 0.95);
+    c.lineTo(-r * 0.25, r * 0.6);
+    c.lineTo(r * 0.45, r * 1.1);
+    c.lineTo(r * 0.6, r * 0.45);
+    c.lineTo(r * 1.2, r * 0.6);
+    c.lineTo(r * 1.05, r * 0.25);
+    c.closePath();
+    c.stroke();
+    // Gem core
+    c.beginPath();
+    c.moveTo(r * 0.55, 0);
+    c.lineTo(r * 0.15, -r * 0.28);
+    c.lineTo(-r * 0.25, 0);
+    c.lineTo(r * 0.15, r * 0.28);
+    c.closePath();
+    c.stroke();
   },
 };
 
@@ -814,7 +948,62 @@ const SHIP_ENGINES = {
   inferno: [{ x: -0.9, y: 0 }],
   photon:  [{ x: -0.85, y: -0.18 }, { x: -0.85, y: 0.18 }],
   voltage: [{ x: -0.75, y: 0 }],
+  seeker:  [{ x: -0.85, y: 0 }],
+  nova:    [{ x: -0.6, y: -0.3 }, { x: -0.6, y: 0.3 }],
+  eclipse: [{ x: -0.75, y: -0.2 }, { x: -0.75, y: 0.2 }],
+  omega:   [{ x: -0.95, y: -0.45 }, { x: -0.95, y: 0 }, { x: -0.95, y: 0.45 }],
 };
+
+// Helper drones (Seeker / Nova / Eclipse / Omega) orbit the ship.
+function dronePositions(p) {
+  const out = [];
+  const n = p.drones || 0;
+  for (let i = 0; i < n; i++) {
+    const a = state.t / 700 + (i / n) * TAU;
+    out.push({ x: p.x + Math.cos(a) * 34, y: p.y + Math.sin(a) * 34 });
+  }
+  return out;
+}
+
+function drawDrones(p) {
+  if (!p.drones) return;
+  ctx.save();
+  ctx.strokeStyle = p.color;
+  ctx.shadowColor = p.color;
+  ctx.shadowBlur = 10;
+  ctx.lineWidth = 1.8;
+  for (const d of dronePositions(p)) {
+    ctx.beginPath();
+    ctx.moveTo(d.x, d.y - 6);
+    ctx.lineTo(d.x + 5, d.y);
+    ctx.lineTo(d.x, d.y + 6);
+    ctx.lineTo(d.x - 5, d.y);
+    ctx.closePath();
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function updateDrones(p) {
+  if (!p.drones || state.enemies.length === 0) return;
+  if (state.t - p.droneFire < 420) return;
+  p.droneFire = state.t;
+  const dmg = Math.max(1, Math.ceil((p.bulletDmg || 1) * 0.5));
+  for (const d of dronePositions(p)) {
+    let best = null, bestD = 520;
+    for (const e of state.enemies) {
+      const dd = len(e.x - d.x, e.y - d.y);
+      if (dd < bestD) { bestD = dd; best = e; }
+    }
+    if (!best) continue;
+    const a = Math.atan2(best.y - d.y, best.x - d.x);
+    state.bullets.push({
+      x: d.x, y: d.y,
+      vx: Math.cos(a) * CFG.bullet.speed, vy: Math.sin(a) * CFG.bullet.speed,
+      life: CFG.bullet.life, age: 0, dmg, fx: null, pierceLeft: 0, color: p.color, small: true,
+    });
+  }
+}
 
 function drawPlayer(p) {
   ctx.save();
@@ -857,7 +1046,7 @@ function drawPlayer(p) {
   ctx.lineWidth = 2.5;
   ctx.shadowColor = shipColor;
   ctx.shadowBlur = 14;
-  SHIP_DRAW[shipId](r);
+  SHIP_DRAW[shipId](ctx, r);
 
   // Shield ring
   if (p.shield > 0) {
@@ -928,23 +1117,38 @@ function updatePlayer(p, dt) {
     fireBullets(p);
     sfx.shoot();
   }
+  updateDrones(p);
 }
 
+// Volley patterns. `side` = sideways offset (twin guns), `a` = angle offset.
+const SHOT_PATTERNS = {
+  1: [{ a: 0, side: 0 }],
+  2: [{ a: 0, side: -6 }, { a: 0, side: 6 }],
+  3: [{ a: -0.2, side: 0 }, { a: 0, side: 0 }, { a: 0.2, side: 0 }],
+  5: [{ a: -0.36, side: 0 }, { a: -0.18, side: 0 }, { a: 0, side: 0 }, { a: 0.18, side: 0 }, { a: 0.36, side: 0 }],
+  7: [{ a: -0.48, side: 0 }, { a: -0.32, side: 0 }, { a: -0.16, side: 0 }, { a: 0, side: 0 },
+      { a: 0.16, side: 0 }, { a: 0.32, side: 0 }, { a: 0.48, side: 0 }],
+};
+
 function fireBullets(p) {
-  const triple = (state.active && state.active.kind === 'triple') || p.alwaysTriple;
-  const spread = triple ? [-0.22, 0, 0.22] : [0];
-  const effect = p.bulletEffect || null;
-  for (const off of spread) {
-    const a = p.angle + off;
+  // Triple Shot power-up STACKS with the ship: single/twin → 3, 3 → 5, 5 → 7.
+  let shots = p.shots || 1;
+  if (state.active && state.active.kind === 'triple') shots = shots < 3 ? 3 : shots + 2;
+  const pattern = SHOT_PATTERNS[shots] || SHOT_PATTERNS[1];
+  const fx = p.fx || null;
+  for (const s of pattern) {
+    const a = p.angle + s.a;
+    const px = -Math.sin(p.angle) * s.side, py = Math.cos(p.angle) * s.side;
     state.bullets.push({
-      x: p.x + Math.cos(a) * p.r,
-      y: p.y + Math.sin(a) * p.r,
+      x: p.x + Math.cos(a) * p.r + px,
+      y: p.y + Math.sin(a) * p.r + py,
       vx: Math.cos(a) * CFG.bullet.speed,
       vy: Math.sin(a) * CFG.bullet.speed,
       life: CFG.bullet.life,
       age: 0,
       dmg: p.bulletDmg || 1,
-      effect,
+      fx,
+      pierceLeft: fx && fx.pierce ? fx.pierce : 0,
       color: p.color,
     });
   }
@@ -970,42 +1174,57 @@ function damagePlayer(p) {
 }
 
 // ---------- Enemies ----------
+// big:  boss-class — gets a named HP bar, survives ramming, takes partial
+//       bomb damage, never spawns as an elite.
+// mini: mini-boss (one of three, rotating on waves 8, 13, 18, 23…)
 const ENEMY_KINDS = {
-  drifter:  { hp: 2, r: 14, speed: 1.0, color: '#ff5dd2', score: 10,  coin: 1,  shape: 'hex' },
-  zoomer:   { hp: 1, r: 11, speed: 2.6, color: '#fff85d', score: 20,  coin: 2,  shape: 'tri' },
-  splitter: { hp: 3, r: 17, speed: 1.3, color: '#6ee7b7', score: 30,  coin: 3,  shape: 'sq' },
-  orbiter:  { hp: 3, r: 13, speed: 1.5, color: '#7df9ff', score: 40,  coin: 4,  shape: 'circle' },
-  tank:     { hp: 7, r: 22, speed: 0.75, color: '#ff4d6d', score: 80,  coin: 8,  shape: 'octa' },
-  // Shielder removed per George's request — replaced by three aggressive chasers below.
-  hunter:   { hp: 8, r: 15, speed: 2.1, color: '#ff3860', score: 150, coin: 14, shape: 'tri' },   // fast red diamond that chases
-  warden:   { hp: 18, r: 24, speed: 1.15, color: '#38d39f', score: 220, coin: 22, shape: 'sq' },  // green pentagon that splits on death
-  colossus: { hp: 40, r: 32, speed: 0.55, color: '#f6b93b', score: 500, coin: 55, shape: 'hex' }, // massive slow gold hex — unstoppable
-  boss:     { hp: 280, r: 46, speed: 0.95, color: '#ff5dd2', score: 800, coin: 120, shape: 'star' },
+  drifter:  { hp: 2,  r: 14, speed: 1.0,  color: '#ff5dd2', score: 10,  coin: 1,  shape: 'hex' },
+  zoomer:   { hp: 1,  r: 11, speed: 2.6,  color: '#fff85d', score: 20,  coin: 2,  shape: 'tri' },
+  weaver:   { hp: 2,  r: 13, speed: 1.7,  color: '#a3e635', score: 20,  coin: 2,  shape: 'diamond' },
+  splitter: { hp: 3,  r: 17, speed: 1.3,  color: '#6ee7b7', score: 30,  coin: 3,  shape: 'sq' },
+  swarmer:  { hp: 1,  r: 8,  speed: 2.3,  color: '#fb923c', score: 8,   coin: 1,  shape: 'tri' },
+  orbiter:  { hp: 3,  r: 13, speed: 1.5,  color: '#7df9ff', score: 40,  coin: 4,  shape: 'circle' },
+  sniper:   { hp: 4,  r: 14, speed: 1.2,  color: '#60a5fa', score: 60,  coin: 6,  shape: 'pent' },
+  tank:     { hp: 7,  r: 22, speed: 0.75, color: '#ff4d6d', score: 80,  coin: 8,  shape: 'octa' },
+  // Shielder removed per George's request — replaced by aggressive chasers.
+  hunter:   { hp: 8,  r: 15, speed: 2.1,  color: '#ff3860', score: 150, coin: 14, shape: 'tri' },
+  pulsar:   { hp: 6,  r: 17, speed: 1.0,  color: '#a78bfa', score: 90,  coin: 9,  shape: 'star4' },
+  blinker:  { hp: 5,  r: 14, speed: 1.4,  color: '#f0abfc', score: 100, coin: 10, shape: 'hept' },
+  warden:   { hp: 18, r: 24, speed: 1.15, color: '#38d39f', score: 220, coin: 22, shape: 'sq' },
+  mender:   { hp: 8,  r: 16, speed: 1.1,  color: '#86efac', score: 140, coin: 14, shape: 'cross' },
+  colossus: { hp: 40, r: 32, speed: 0.55, color: '#f6b93b', score: 500, coin: 55, shape: 'hex' },
+  // Mini-bosses — real bosses with their own attack patterns
+  sentinel: { hp: 70, r: 34, speed: 1.0,  color: '#22d3ee', score: 400, coin: 60, shape: 'hex',     big: true, mini: true, name: 'MINI-BOSS · SENTINEL' },
+  hive:     { hp: 80, r: 36, speed: 0.6,  color: '#facc15', score: 400, coin: 60, shape: 'octa',    big: true, mini: true, name: 'MINI-BOSS · HIVE QUEEN' },
+  ravager:  { hp: 75, r: 32, speed: 1.0,  color: '#f43f5e', score: 400, coin: 60, shape: 'diamond', big: true, mini: true, name: 'MINI-BOSS · RAVAGER' },
+  boss:     { hp: 180, r: 46, speed: 0.95, color: '#ff5dd2', score: 800, coin: 120, shape: 'star',  big: true, name: 'BOSS' },
 };
+const MINI_BOSSES = ['sentinel', 'hive', 'ravager'];
 
-// Per-wave HP scaling. Two-piece: linear through wave 20, then exponential
-// past wave 20 so that even a maxed-out pilot with the best ship can't
-// mow through late-game waves.
+// Ranged / support enemies stay on screen once they've arrived so the wave
+// can always be finished (and so you can always shoot them).
+const KEEP_ON_SCREEN = { sniper: 1, pulsar: 1, mender: 1, blinker: 1, sentinel: 1, hive: 1, ravager: 1 };
+
+function isMiniBossWave(n) { return n >= 8 && n % 5 === 3; }   // 8, 13, 18, 23, 28…
+
+// Per-wave HP scaling. Linear through wave 20, then compounding so a
+// maxed-out pilot still gets a fight.  Bosses scale gentler than before
+// (George: "bosses are a bit too hard").
 function enemyHpScale(kind, wave) {
+  const big = ENEMY_KINDS[kind] && ENEMY_KINDS[kind].big;
   const w = Math.max(0, wave - 5);
-  const base = kind === 'boss' ? 0.6 : 0.32;
-  let s = 1 + w * base;
-  if (wave > 20) {
-    const past = wave - 20;
-    // Extra multiplier compounds — wave 25 = 1.65x, wave 30 = 2.72x, wave 40 = 7.4x
-    s *= Math.pow(kind === 'boss' ? 1.18 : 1.12, past);
-  }
+  let s = 1 + w * (big ? 0.4 : 0.32);
+  if (wave > 20) s *= Math.pow(1.12, wave - 20);   // wave 25 ≈ 1.76×, wave 30 ≈ 3.1×
   return s;
 }
 
-// Late-game speed boost (cap +80% now) so enemies catch up to a maxed player.
+// Late-game speed boost (cap +80%) so enemies catch up to a maxed player.
 function enemySpeedScale(wave) {
   return 1 + Math.min(0.8, Math.max(0, wave - 5) * 0.055);
 }
 
-// Elite spawn — any non-boss enemy can be elevated on high waves:
-// 3× HP, +30% speed, +40% size, drops 2× coins. Small % chance ramps
-// with wave so wave 25+ feels genuinely mean.
+// Elite spawn — any regular enemy can be elevated on high waves:
+// 3× HP, +30% speed, +40% size, drops 2× coins.
 function eliteChance(wave) {
   if (wave < 10) return 0;
   return Math.min(0.28, (wave - 10) * 0.018);   // 0% @ w10 → 28% @ w25+
@@ -1015,12 +1234,12 @@ function makeEnemy(kind, x, y, opts = {}) {
   const k = ENEMY_KINDS[kind];
   const scale = (opts.hp ? 1 : enemyHpScale(kind, state.wave));
   let hp = Math.ceil((opts.hp || k.hp) * scale);
-  let speed = (opts.speed || k.speed) * enemySpeedScale(state.wave);
+  let speed = (opts.speed || k.speed) * (k.big ? 1 : enemySpeedScale(state.wave));
   let r = opts.r || k.r;
   let score = opts.score || k.score;
   let coin = k.coin || 1;
   let elite = false;
-  if (!opts.hp && kind !== 'boss' && Math.random() < eliteChance(state.wave)) {
+  if (!opts.hp && !opts.noElite && !k.big && Math.random() < eliteChance(state.wave)) {
     elite = true;
     hp = Math.ceil(hp * 3);
     speed *= 1.3;
@@ -1033,99 +1252,307 @@ function makeEnemy(kind, x, y, opts = {}) {
     r, hp, maxHp: hp, speed,
     color: k.color,
     shape: k.shape,
+    big: !!k.big, mini: !!k.mini,
+    name: kind === 'boss' ? (MILESTONES[state.wave] ? `BOSS · ${MILESTONES[state.wave]}` : 'BOSS') : k.name,
     score, coin, elite,
     born: state.t,
-    fireT: state.t + rand(800, 2200),
+    fireT: state.t + rand(1200, 2400),
     orbitA: rand(0, TAU),
     spinPhase: rand(0, TAU),
   };
 }
 
-function spawnEnemyAtEdge(kind) {
-  const side = randi(0, 3);
+function spawnEnemyAtEdge(kind, near) {
   let x, y;
-  if (side === 0) { x = rand(0, state.w); y = -30; }
-  else if (side === 1) { x = state.w + 30; y = rand(0, state.h); }
-  else if (side === 2) { x = rand(0, state.w); y = state.h + 30; }
-  else { x = -30; y = rand(0, state.h); }
+  if (near) {
+    // Packs (swarmers) arrive together from the same spot
+    x = near.x + rand(-26, 26); y = near.y + rand(-26, 26);
+  } else {
+    const side = randi(0, 3);
+    if (side === 0) { x = rand(0, state.w); y = -30; }
+    else if (side === 1) { x = state.w + 30; y = rand(0, state.h); }
+    else if (side === 2) { x = rand(0, state.w); y = state.h + 30; }
+    else { x = -30; y = rand(0, state.h); }
+  }
   return makeEnemy(kind, x, y);
+}
+
+// Accelerate toward (tx, ty) with friction and a speed cap.
+function steer(e, tx, ty, accel, fric, cap) {
+  e.vx += tx * accel; e.vy += ty * accel;
+  e.vx *= fric; e.vy *= fric;
+  const sp = len(e.vx, e.vy);
+  if (sp > cap) { e.vx = e.vx / sp * cap; e.vy = e.vy / sp * cap; }
+}
+
+function spawnEBullet(x, y, a, speed, opts) {
+  opts = opts || {};
+  state.ebullets.push({
+    x, y,
+    vx: Math.cos(a) * speed, vy: Math.sin(a) * speed,
+    life: CFG.enemyBullet.life, age: 0,
+    r: opts.r || CFG.enemyBullet.r,
+    color: opts.color || null,
+  });
+}
+
+function pickAnchor(e) {
+  const p = state.player;
+  let ax = state.w / 2, ay = state.h * 0.3;
+  for (let tries = 0; tries < 8; tries++) {
+    ax = rand(state.w * 0.15, state.w * 0.85);
+    ay = rand(state.h * 0.15, state.h * 0.75);
+    if (len(ax - p.x, ay - p.y) > 200) break;
+  }
+  e.ax = ax; e.ay = ay;
 }
 
 function updateEnemy(e, dt) {
   const p = state.player;
   const dx = p.x - e.x, dy = p.y - e.y;
   const d = len(dx, dy) || 1;
-  e.spinPhase += 0.04;
+  const ux = dx / d, uy = dy / d;
+  e.spinPhase += e.big ? 0.02 : 0.04;
 
-  if (e.kind === 'drifter' || e.kind === 'splitter' || e.kind === 'tank' || e.kind === 'warden' || e.kind === 'colossus') {
-    // Direct chase (colossus and warden included — George wants strong things
-    // that actually MOVE toward you)
-    e.vx += (dx / d) * e.speed * 0.12;
-    e.vy += (dy / d) * e.speed * 0.12;
-    e.vx *= 0.92; e.vy *= 0.92;
-    const cap = e.speed;
-    const sp = len(e.vx, e.vy);
-    if (sp > cap) { e.vx = e.vx / sp * cap; e.vy = e.vy / sp * cap; }
-  } else if (e.kind === 'hunter') {
-    // Aggressive dasher — steers straight for you with a periodic burst
-    // that makes it hard to kite. No shooting.
-    e.vx += (dx / d) * e.speed * 0.18;
-    e.vy += (dy / d) * e.speed * 0.18;
-    // Dash surge every ~1.8s at ×1.7 max speed
-    e.dashT = (e.dashT || 0) + dt;
-    const dashing = e.dashT > 1400 && e.dashT < 1900;
-    if (e.dashT > 1900) e.dashT = 0;
-    const cap = e.speed * (dashing ? 1.7 : 1);
-    e.vx *= 0.9; e.vy *= 0.9;
-    const sp = len(e.vx, e.vy);
-    if (sp > cap) { e.vx = e.vx / sp * cap; e.vy = e.vy / sp * cap; }
-  } else if (e.kind === 'zoomer') {
-    // commits to a direction once close, otherwise chases
-    if (d < 320) {
-      e.vx += (dx / d) * 0.18;
-      e.vy += (dy / d) * 0.18;
+  switch (e.kind) {
+    case 'drifter': case 'splitter': case 'tank': case 'warden': case 'colossus':
+      // Direct chase (colossus and warden included — George wants strong
+      // things that actually MOVE toward you)
+      steer(e, ux, uy, e.speed * 0.12, 0.92, e.speed);
+      break;
+
+    case 'swarmer':
+      steer(e, ux, uy, e.speed * 0.2, 0.93, e.speed);
+      break;
+
+    case 'weaver': {
+      // Snakes toward you in an S-curve — hard to line up a shot
+      const wob = Math.sin(state.t / 260 + e.orbitA) * 1.3;
+      const tx = ux - uy * wob, ty = uy + ux * wob;
+      const tl = len(tx, ty) || 1;
+      e.vx = tx / tl * e.speed; e.vy = ty / tl * e.speed;
+      break;
     }
-    const sp = len(e.vx, e.vy);
-    if (sp > e.speed) { e.vx = e.vx / sp * e.speed; e.vy = e.vy / sp * e.speed; }
-    if (sp < 0.1) { e.vx = (dx / d) * e.speed; e.vy = (dy / d) * e.speed; }
-  } else if (e.kind === 'orbiter') {
-    // orbits at distance + shoots
-    const desired = 240;
-    const radial = (dx / d) * (d - desired) * 0.01;
-    e.orbitA += 0.03;
-    const tx = Math.cos(e.orbitA), ty = Math.sin(e.orbitA);
-    e.vx = (dx / d) * 0.6 * Math.sign(d - desired) * e.speed + (-ty) * e.speed * 0.7;
-    e.vy = (dy / d) * 0.6 * Math.sign(d - desired) * e.speed + (tx) * e.speed * 0.7;
-    if (state.t > e.fireT) {
-      e.fireT = state.t + rand(1800, 2800);
-      enemyShoot(e);
+
+    case 'hunter': {
+      // Aggressive dasher — steers straight for you with a periodic burst
+      e.vx += ux * e.speed * 0.18;
+      e.vy += uy * e.speed * 0.18;
+      e.dashT = (e.dashT || 0) + dt;
+      const dashing = e.dashT > 1400 && e.dashT < 1900;
+      if (e.dashT > 1900) e.dashT = 0;
+      const cap = e.speed * (dashing ? 1.7 : 1);
+      e.vx *= 0.9; e.vy *= 0.9;
+      const sp = len(e.vx, e.vy);
+      if (sp > cap) { e.vx = e.vx / sp * cap; e.vy = e.vy / sp * cap; }
+      break;
     }
-  } else if (e.kind === 'boss') {
-    // drifts around upper area + shoots barrages
-    const target = { x: state.w / 2 + Math.sin(state.t / 1200) * 200, y: state.h * 0.28 + Math.cos(state.t / 1700) * 60 };
-    e.vx += (target.x - e.x) * 0.0015;
-    e.vy += (target.y - e.y) * 0.0015;
-    e.vx *= 0.97; e.vy *= 0.97;
-    if (state.t > e.fireT) {
-      // Boss fires faster the higher the wave — 900ms at wave 5, down to
-      // about 500ms by wave 25. Late bosses are meant to punish.
-      const cool = Math.max(450, 900 - state.wave * 18);
-      e.fireT = state.t + cool;
-      bossBarrage(e);
+
+    case 'zoomer': {
+      // commits to a direction once close, otherwise chases
+      if (d < 320) { e.vx += ux * 0.18; e.vy += uy * 0.18; }
+      const sp = len(e.vx, e.vy);
+      if (sp > e.speed) { e.vx = e.vx / sp * e.speed; e.vy = e.vy / sp * e.speed; }
+      if (sp < 0.1) { e.vx = ux * e.speed; e.vy = uy * e.speed; }
+      break;
+    }
+
+    case 'orbiter': {
+      // orbits at distance + shoots
+      const desired = 240;
+      e.orbitA += 0.03;
+      const tx = Math.cos(e.orbitA), ty = Math.sin(e.orbitA);
+      e.vx = ux * 0.6 * Math.sign(d - desired) * e.speed + (-ty) * e.speed * 0.7;
+      e.vy = uy * 0.6 * Math.sign(d - desired) * e.speed + (tx) * e.speed * 0.7;
+      if (state.t > e.fireT) {
+        e.fireT = state.t + rand(1800, 2800);
+        enemyShoot(e);
+      }
+      break;
+    }
+
+    case 'sniper': {
+      // Hangs back, locks on with a red laser, then fires a FAST shot at
+      // where you were.  Keep moving and it misses.
+      const want = Math.min(380, Math.min(state.w, state.h) * 0.42);
+      const radial = d > want + 30 ? 1 : d < want - 30 ? -1 : 0;
+      e.orbitA += 0.01;
+      const strafe = Math.sin(e.orbitA) >= 0 ? 0.5 : -0.5;
+      const slowAim = e.aimUntil ? 0.15 : 1;
+      e.vx = (ux * radial - uy * strafe) * e.speed * slowAim;
+      e.vy = (uy * radial + ux * strafe) * e.speed * slowAim;
+      if (!e.aimUntil && state.t > e.fireT && e.onScreen) {
+        e.aimUntil = state.t + 900;
+        e.aimX = p.x; e.aimY = p.y;
+      } else if (e.aimUntil && state.t >= e.aimUntil) {
+        spawnEBullet(e.x, e.y, Math.atan2(e.aimY - e.y, e.aimX - e.x), 8.5, { r: 4.5, color: '#60a5fa' });
+        e.aimUntil = 0;
+        e.fireT = state.t + rand(2600, 3400);
+      }
+      break;
+    }
+
+    case 'pulsar': {
+      // Floats to mid-range and pulses out a ring of bullets
+      const radial = d > 230 ? 1 : -0.5;
+      steer(e, ux * radial, uy * radial, e.speed * 0.1, 0.93, e.speed);
+      if (state.t > e.fireT && e.onScreen) {
+        e.fireT = state.t + 2800;
+        const n = state.wave >= 20 ? 10 : 8;
+        const off = rand(0, TAU);
+        for (let i = 0; i < n; i++) spawnEBullet(e.x, e.y, off + (i / n) * TAU, 3.1, { color: '#a78bfa' });
+      }
+      break;
+    }
+
+    case 'blinker': {
+      // Drifts toward you, flickers, then TELEPORTS close by
+      steer(e, ux, uy, e.speed * 0.1, 0.92, e.speed);
+      e.blinkT = (e.blinkT || 0) + dt;
+      if (e.blinkT > 3000 && e.onScreen) {
+        e.blinkT = 0;
+        spawnParticles(e.x, e.y, e.color, 10, 4, 400);
+        const a = rand(0, TAU), rr = rand(150, 210);
+        e.x = clamp(p.x + Math.cos(a) * rr, 30, state.w - 30);
+        e.y = clamp(p.y + Math.sin(a) * rr, 30, state.h - 30);
+        e.vx = 0; e.vy = 0;
+        spawnParticles(e.x, e.y, e.color, 10, 4, 400);
+      }
+      break;
+    }
+
+    case 'mender': {
+      // Support unit — keeps its distance and HEALS nearby enemies.
+      // Shoot it first!
+      const radial = d > 300 ? 0.6 : -1;
+      steer(e, ux * radial, uy * radial, e.speed * 0.1, 0.92, e.speed);
+      if (state.t > e.fireT && e.onScreen) {
+        e.fireT = state.t + 2400;
+        e.healFlash = state.t;
+        for (const o of state.enemies) {
+          if (o === e || o.big || o.hp <= 0 || o.hp >= o.maxHp) continue;
+          if (len(o.x - e.x, o.y - e.y) < 170) {
+            o.hp = Math.min(o.maxHp, o.hp + Math.ceil(o.maxHp * 0.25));
+            addFloatText(o.x, o.y - o.r - 6, '+', '#86efac');
+          }
+        }
+      }
+      break;
+    }
+
+    // ----- Mini-bosses -----
+    case 'sentinel': {
+      // Glides between anchor points, then stops and spins out spiral streams
+      if (!e.phase) { e.phase = 'move'; e.phaseT = 0; pickAnchor(e); }
+      e.phaseT += dt;
+      if (e.phase === 'move') {
+        const ax = e.ax - e.x, ay = e.ay - e.y, ad = len(ax, ay) || 1;
+        steer(e, ax / ad, ay / ad, 0.12, 0.93, 2.2);
+        if (e.phaseT > 1800 && e.onScreen) { e.phase = 'fire'; e.phaseT = 0; e.shotT = 0; }
+      } else {
+        e.vx *= 0.9; e.vy *= 0.9;
+        e.shotT -= dt;
+        if (e.shotT <= 0) {
+          e.shotT = 150;
+          const arms = state.wave >= 23 ? 4 : 3;
+          e.spiralA = (e.spiralA || 0) + 0.26;
+          for (let i = 0; i < arms; i++) spawnEBullet(e.x, e.y, e.spiralA + (i / arms) * TAU, 3, { color: '#22d3ee' });
+        }
+        if (e.phaseT > 2200) { e.phase = 'move'; e.phaseT = 0; pickAnchor(e); }
+      }
+      break;
+    }
+
+    case 'hive': {
+      // Slow mother ship: hatches swarmers + fires 3-shot spreads
+      steer(e, ux, uy, e.speed * 0.1, 0.93, e.speed);
+      e.spawnT = (e.spawnT || 0) + dt;
+      if (e.spawnT > 3800 && e.onScreen && state.enemies.length < 45) {
+        e.spawnT = 0;
+        const n = state.wave >= 23 ? 4 : 3;
+        for (let i = 0; i < n; i++) {
+          const a = rand(0, TAU);
+          const s = makeEnemy('swarmer', e.x + Math.cos(a) * e.r, e.y + Math.sin(a) * e.r, { noElite: true });
+          s.vx = Math.cos(a) * 3; s.vy = Math.sin(a) * 3;
+          s.onScreen = true;
+          state.enemies.push(s);
+        }
+        spawnParticles(e.x, e.y, e.color, 14, 5, 500);
+      }
+      if (state.t > e.fireT && e.onScreen) {
+        e.fireT = state.t + 1900;
+        const a = Math.atan2(dy, dx);
+        for (const off of [-0.25, 0, 0.25]) spawnEBullet(e.x, e.y, a + off, 3.6, { color: '#facc15' });
+      }
+      break;
+    }
+
+    case 'ravager': {
+      // Stalks you, winds up (red warning line), CHARGES, then bursts
+      if (!e.phase) { e.phase = 'stalk'; e.phaseT = 0; }
+      e.phaseT += dt;
+      if (e.phase === 'stalk') {
+        steer(e, ux, uy, 0.1, 0.92, e.speed);
+        if (e.phaseT > 1600 && e.onScreen) { e.phase = 'windup'; e.phaseT = 0; e.aimX = p.x; e.aimY = p.y; }
+      } else if (e.phase === 'windup') {
+        e.vx *= 0.85; e.vy *= 0.85;
+        if (e.phaseT > 800) {
+          const a = Math.atan2(e.aimY - e.y, e.aimX - e.x);
+          const sp = 8 + Math.min(3, state.wave * 0.08);
+          e.vx = Math.cos(a) * sp; e.vy = Math.sin(a) * sp;
+          e.phase = 'dash'; e.phaseT = 0;
+          shake(4);
+        }
+      } else {
+        const atWall = e.x <= e.r + 2 || e.x >= state.w - e.r - 2 || e.y <= e.r + 2 || e.y >= state.h - e.r - 2;
+        if (e.phaseT > 650 || (atWall && e.phaseT > 100)) {
+          e.vx *= 0.2; e.vy *= 0.2;
+          const n = state.wave >= 23 ? 12 : 8;
+          const off = rand(0, TAU);
+          for (let i = 0; i < n; i++) spawnEBullet(e.x, e.y, off + (i / n) * TAU, 3, { color: '#f43f5e' });
+          spawnParticles(e.x, e.y, e.color, 18, 6, 500);
+          shake(6);
+          e.phase = 'stalk'; e.phaseT = 0;
+        }
+      }
+      break;
+    }
+
+    case 'boss': {
+      // drifts around upper area + shoots
+      const target = { x: state.w / 2 + Math.sin(state.t / 1200) * 200, y: state.h * 0.28 + Math.cos(state.t / 1700) * 60 };
+      e.vx += (target.x - e.x) * 0.0015;
+      e.vy += (target.y - e.y) * 0.0015;
+      e.vx *= 0.97; e.vy *= 0.97;
+      if (state.t > e.fireT) {
+        // Toned down (George: bosses too hard): slower cadence, fewer
+        // bullets, and every ring has a GAP you can slip through.
+        const cool = Math.max(750, 1250 - state.wave * 12);
+        e.fireT = state.t + cool;
+        e.volley = (e.volley || 0) + 1;
+        if (e.volley % 3 === 0) bossFan(e); else bossBarrage(e);
+      }
+      break;
     }
   }
 
-  const slowMul = (e.slowUntil && state.t < e.slowUntil) ? 0.4 : 1;
-  const tailMul = state.tailMul || 1;
+  const slowMul = (e.slowUntil && state.t < e.slowUntil) ? (e.big ? 0.7 : 0.4) : 1;
+  const tailMul = e.big ? 1 : (state.tailMul || 1);
   e.x += e.vx * state.slowmo * slowMul * tailMul;
   e.y += e.vy * state.slowmo * slowMul * tailMul;
 
-  // Fire DoT (Inferno): every 250ms while burning, take fireDmg.
+  if (!e.onScreen && e.x > e.r && e.x < state.w - e.r && e.y > e.r && e.y < state.h - e.r) e.onScreen = true;
+  if (e.onScreen && KEEP_ON_SCREEN[e.kind]) {
+    e.x = clamp(e.x, e.r, state.w - e.r);
+    e.y = clamp(e.y, e.r, state.h - e.r);
+  }
+
+  // Burn damage-over-time: every 250ms while burning, take fireDmg.
   if (e.fireUntil && state.t < e.fireUntil) {
     if (state.t - (e.fireLastTick || 0) > 250) {
       e.fireLastTick = state.t;
       e.hp -= (e.fireDmg || 0.4);
-      state.particles.push({
+      pushParticle({
         x: e.x + rand(-e.r * 0.5, e.r * 0.5),
         y: e.y + rand(-e.r * 0.5, 0),
         vx: rand(-0.6, 0.6), vy: -1.6,
@@ -1137,53 +1564,123 @@ function updateEnemy(e, dt) {
 
 function enemyShoot(e) {
   const p = state.player;
-  const a = Math.atan2(p.y - e.y, p.x - e.x);
-  state.ebullets.push({
-    x: e.x, y: e.y,
-    vx: Math.cos(a) * CFG.enemyBullet.speed,
-    vy: Math.sin(a) * CFG.enemyBullet.speed,
-    life: CFG.enemyBullet.life, age: 0,
-    r: CFG.enemyBullet.r,
-  });
+  spawnEBullet(e.x, e.y, Math.atan2(p.y - e.y, p.x - e.x), CFG.enemyBullet.speed);
 }
 
 function bossBarrage(boss) {
-  // More bullets per barrage on higher waves so bosses feel meaner.
-  const N = Math.min(24, 12 + Math.floor(state.wave / 3));
+  // Rotating ring with a 3-bullet gap — find the gap and you're safe.
+  const N = Math.min(18, 10 + Math.floor(state.wave / 5));
   const base = state.t / 400;
+  const gap = randi(0, N - 1);
   for (let i = 0; i < N; i++) {
-    const a = base + (i / N) * TAU;
-    state.ebullets.push({
-      x: boss.x, y: boss.y,
-      vx: Math.cos(a) * CFG.enemyBullet.speed * 0.85,
-      vy: Math.sin(a) * CFG.enemyBullet.speed * 0.85,
-      life: CFG.enemyBullet.life, age: 0,
-      r: CFG.enemyBullet.r,
-    });
+    const k = (i - gap + N) % N;
+    if (k < 3) continue;
+    spawnEBullet(boss.x, boss.y, base + (i / N) * TAU, CFG.enemyBullet.speed * 0.8);
   }
 }
 
+function bossFan(boss) {
+  // Aimed 5-bullet fan — sidestep it.
+  const p = state.player;
+  const a = Math.atan2(p.y - boss.y, p.x - boss.x);
+  for (let i = -2; i <= 2; i++) spawnEBullet(boss.x, boss.y, a + i * 0.2, CFG.enemyBullet.speed * 0.9);
+}
+
+// --- Shape paths (shared by the game canvas and the enemy guide) ---
+function polyPath(c, sides, r) {
+  for (let i = 0; i <= sides; i++) {
+    const a = (i / sides) * TAU - Math.PI / 2;
+    const x = Math.cos(a) * r, y = Math.sin(a) * r;
+    if (i === 0) c.moveTo(x, y); else c.lineTo(x, y);
+  }
+}
+function starPath(c, points, outer, inner) {
+  for (let i = 0; i <= points * 2; i++) {
+    const a = (i / (points * 2)) * TAU - Math.PI / 2;
+    const r = (i % 2 === 0) ? outer : inner;
+    const x = Math.cos(a) * r, y = Math.sin(a) * r;
+    if (i === 0) c.moveTo(x, y); else c.lineTo(x, y);
+  }
+}
+function traceShape(c, shape, r) {
+  c.beginPath();
+  if (shape === 'circle') {
+    c.arc(0, 0, r, 0, TAU);
+    c.moveTo(r * 0.55, 0);
+    c.arc(0, 0, r * 0.55, 0, TAU);
+  } else if (shape === 'star') {
+    starPath(c, 5, r, r * 0.5);
+  } else if (shape === 'star4') {
+    starPath(c, 4, r, r * 0.45);
+  } else if (shape === 'diamond') {
+    c.moveTo(0, -r); c.lineTo(r * 0.68, 0); c.lineTo(0, r); c.lineTo(-r * 0.68, 0); c.closePath();
+  } else if (shape === 'cross') {
+    const t = r * 0.36;
+    const pts = [[-t, -r], [t, -r], [t, -t], [r, -t], [r, t], [t, t], [t, r], [-t, r], [-t, t], [-r, t], [-r, -t], [-t, -t]];
+    pts.forEach((q, i) => { if (i === 0) c.moveTo(q[0], q[1]); else c.lineTo(q[0], q[1]); });
+    c.closePath();
+  } else {
+    polyPath(c, SHAPE_SIDES[shape] || 6, r);
+  }
+  c.stroke();
+}
+
 function drawEnemy(e) {
+  // Lock-on warning lines (Sniper aim, Ravager wind-up) — world space
+  const aiming = (e.kind === 'sniper' && e.aimUntil) || (e.kind === 'ravager' && e.phase === 'windup');
+  if (aiming) {
+    const a = Math.atan2(e.aimY - e.y, e.aimX - e.x);
+    ctx.save();
+    ctx.globalAlpha = 0.35 + 0.35 * Math.sin(state.t / 50);
+    ctx.strokeStyle = e.color;
+    ctx.lineWidth = e.kind === 'ravager' ? e.r * 0.9 : 1.5;
+    if (e.kind === 'ravager') ctx.globalAlpha *= 0.35;
+    ctx.beginPath();
+    ctx.moveTo(e.x, e.y);
+    ctx.lineTo(e.x + Math.cos(a) * 1400, e.y + Math.sin(a) * 1400);
+    ctx.stroke();
+    ctx.restore();
+  }
+  // Mender heal pulse
+  if (e.kind === 'mender' && e.healFlash && state.t - e.healFlash < 450) {
+    const k = (state.t - e.healFlash) / 450;
+    ctx.save();
+    ctx.globalAlpha = 0.6 * (1 - k);
+    ctx.strokeStyle = e.color;
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(e.x, e.y, 20 + 150 * k, 0, TAU); ctx.stroke();
+    ctx.restore();
+  }
+
   ctx.save();
   ctx.translate(e.x, e.y);
+  if (e.kind === 'ravager' && e.phase === 'windup') ctx.translate(rand(-2.5, 2.5), rand(-2.5, 2.5));
+  if (e.kind === 'blinker' && (e.blinkT || 0) > 2400) ctx.globalAlpha = Math.floor(state.t / 70) % 2 ? 0.25 : 1;
   ctx.strokeStyle = e.color;
   ctx.shadowColor = e.color;
-  ctx.shadowBlur = e.elite ? 22 : 14;
-  ctx.lineWidth = e.elite ? 3.4 : 2.5;
+  ctx.shadowBlur = (e.elite || e.big) ? 22 : 14;
+  ctx.lineWidth = e.elite || e.big ? 3.4 : 2.5;
   const r = e.r;
   ctx.rotate(e.spinPhase);
 
-  if (e.shape === 'hex') drawPoly(6, r);
-  else if (e.shape === 'tri') drawPoly(3, r);
-  else if (e.shape === 'sq') drawPoly(4, r);
-  else if (e.shape === 'octa') drawPoly(8, r);
-  else if (e.shape === 'circle') {
-    ctx.beginPath(); ctx.arc(0, 0, r, 0, TAU); ctx.stroke();
-    ctx.beginPath(); ctx.arc(0, 0, r * 0.55, 0, TAU); ctx.stroke();
-  } else if (e.shape === 'star') {
-    drawStar(5, r, r * 0.5);
-    ctx.shadowBlur = 22;
-    drawStar(5, r * 0.7, r * 0.35);
+  traceShape(ctx, e.shape, r);
+  if (e.kind === 'boss') {
+    traceShape(ctx, 'star', r * 0.7);
+  } else if (e.mini) {
+    // Counter-rotating inner core marks a mini-boss
+    ctx.save();
+    ctx.rotate(-e.spinPhase * 3);
+    ctx.lineWidth = 2;
+    traceShape(ctx, e.shape, r * 0.55);
+    ctx.restore();
+  }
+
+  // Attack tells: Boss & Pulsar glow white just before they fire
+  const tell = (e.kind === 'boss' || e.kind === 'pulsar') && e.fireT - state.t < 300 && e.fireT > state.t;
+  if (tell) {
+    ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(0, 0, r * 1.25, 0, TAU); ctx.stroke();
   }
 
   // Elite: white pulsing halo ring around the enemy
@@ -1196,55 +1693,44 @@ function drawEnemy(e) {
     ctx.stroke();
   }
 
-  // HP indicator for tougher enemies
-  if (e.maxHp > 1 && e.kind !== 'boss') {
+  // HP indicator for tougher regular enemies
+  if (e.maxHp > 1 && !e.big) {
     ctx.shadowBlur = 0;
     ctx.fillStyle = e.color;
-    ctx.globalAlpha = e.hp / e.maxHp;
+    ctx.globalAlpha = clamp(e.hp / e.maxHp, 0, 1);
     ctx.beginPath(); ctx.arc(0, 0, r * 0.25, 0, TAU); ctx.fill();
     ctx.globalAlpha = 1;
   }
   ctx.restore();
+}
 
-  // Boss HP bar at top
-  if (e.kind === 'boss') {
+// Named HP bars for bosses and mini-bosses, stacked at the top.
+function drawBigBars() {
+  let row = 0;
+  for (const e of state.enemies) {
+    if (!e.big) continue;
     const w = Math.min(state.w - 40, 480);
     const x = (state.w - w) / 2;
-    const y = 60;
+    const y = 74 + row * 30;
     ctx.save();
+    ctx.font = '800 11px Quicksand, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = e.color;
+    ctx.fillText(e.name || 'BOSS', state.w / 2, y - 4);
     ctx.fillStyle = 'rgba(10, 14, 38, 0.7)';
-    ctx.fillRect(x, y, w, 10);
+    ctx.fillRect(x, y, w, 9);
     ctx.fillStyle = e.color;
     ctx.shadowColor = e.color;
     ctx.shadowBlur = 12;
-    ctx.fillRect(x, y, w * (e.hp / e.maxHp), 10);
+    ctx.fillRect(x, y, w * clamp(e.hp / e.maxHp, 0, 1), 9);
     ctx.restore();
+    row++;
   }
-}
-
-function drawPoly(sides, r) {
-  ctx.beginPath();
-  for (let i = 0; i <= sides; i++) {
-    const a = (i / sides) * TAU - Math.PI / 2;
-    const x = Math.cos(a) * r, y = Math.sin(a) * r;
-    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-  }
-  ctx.stroke();
-}
-function drawStar(points, outer, inner) {
-  ctx.beginPath();
-  for (let i = 0; i <= points * 2; i++) {
-    const a = (i / (points * 2)) * TAU - Math.PI / 2;
-    const r = (i % 2 === 0) ? outer : inner;
-    const x = Math.cos(a) * r, y = Math.sin(a) * r;
-    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-  }
-  ctx.stroke();
 }
 
 function killEnemy(e, fromPlayer = true) {
-  spawnParticles(e.x, e.y, e.color, e.kind === 'boss' ? 90 : 18, e.kind === 'boss' ? 9 : 5, e.kind === 'boss' ? 1400 : 700);
-  shake(e.kind === 'boss' ? 22 : 8);
+  spawnParticles(e.x, e.y, e.color, e.big ? 90 : 18, e.big ? 9 : 5, e.big ? 1400 : 700);
+  shake(e.big ? 22 : 8);
 
   if (fromPlayer) {
     bumpCombo();
@@ -1261,11 +1747,11 @@ function killEnemy(e, fromPlayer = true) {
     addFloatText(e.x, e.y, `+${pts}`, e.color);
     addFloatText(e.x, e.y + 14, `🪙 ${coinReward}`, '#fff85d');
 
-    if (e.kind === 'boss') sfx.bigKill();
+    if (e.big) sfx.bigKill();
     else sfx.kill();
 
-    // Maybe drop power-up
-    if (Math.random() < CFG.powerupDrop || e.kind === 'boss') {
+    // Maybe drop power-up (bosses & mini-bosses always drop one)
+    if (Math.random() < CFG.powerupDrop || e.big) {
       spawnPowerup(e.x, e.y);
     }
   }
@@ -1299,6 +1785,8 @@ function killEnemy(e, fromPlayer = true) {
 
   if (e.kind === 'boss') {
     addFloatText(state.w / 2, state.h / 2 - 60, 'BOSS DOWN!', '#fff85d');
+  } else if (e.mini) {
+    addFloatText(state.w / 2, state.h / 2 - 60, 'MINI-BOSS DOWN!', e.color);
   }
 }
 
@@ -1402,8 +1890,11 @@ function detonateBomb() {
   // Damage all on screen (except boss takes partial)
   for (let i = state.enemies.length - 1; i >= 0; i--) {
     const e = state.enemies[i];
-    if (e.kind === 'boss') { e.hp -= 12; if (e.hp <= 0) killEnemy(e); }
-    else killEnemy(e);
+    if (e.big) {
+      // Bombs chunk big enemies instead of one-shotting them
+      e.hp -= Math.max(12, Math.ceil(e.maxHp * (e.mini ? 0.2 : 0.1)));
+      if (e.hp <= 0) killEnemy(e);
+    } else killEnemy(e);
   }
   state.ebullets.length = 0;
   if (state.active && state.active.kind === 'bomb') clearActivePower();
@@ -1448,12 +1939,12 @@ function startWave(n) {
 
   // Banner — milestone name wins; otherwise mini-boss / generic
   const milestoneName = MILESTONES[n];
-  const miniBoss = (n === 8 || n === 12 || n === 16 || (n >= 22 && (n - 22) % 5 === 2));
   if (milestoneName) {
     showBanner(`WAVE ${n}`, milestoneName);
     state.milestonesHit.push({ wave: n, name: milestoneName });
-  } else if (miniBoss) {
-    showBanner(`WAVE ${n}`, 'MINI-BOSS · ELITE SQUAD');
+  } else if (isMiniBossWave(n)) {
+    const minis = miniBossesFor(n).map(k => ENEMY_KINDS[k].name.replace('MINI-BOSS · ', ''));
+    showBanner(`WAVE ${n} · MINI-BOSS`, minis.join(' + '));
   } else if (n === 1) {
     showBanner(`WAVE ${n}`, 'INCOMING');
   } else {
@@ -1461,62 +1952,94 @@ function startWave(n) {
   }
 }
 
+// Which mini-boss(es) guard a mini-boss wave.  They rotate Sentinel → Hive
+// → Ravager, and from wave 28 two different ones team up.
+function miniBossesFor(n) {
+  const idx = Math.floor((n - 8) / 5) % MINI_BOSSES.length;
+  const list = [MINI_BOSSES[idx]];
+  if (n >= 28) list.push(MINI_BOSSES[(idx + 1) % MINI_BOSSES.length]);
+  return list;
+}
+
+// Spawn weights for regular waves.  Each enemy unlocks at a wave and its
+// weight shifts as waves climb (early fodder fades, heavies grow).
+function enemyWeights(n) {
+  const w = [];
+  const add = (kind, from, weight) => { if (n >= from && weight > 0) w.push([kind, weight]); };
+  add('drifter',  1,  Math.max(0.5, 6 - n * 0.4));
+  add('zoomer',   1,  3);
+  add('weaver',   3,  2.4);
+  add('splitter', 3,  2.2);
+  add('swarmer',  4,  1.4);
+  add('orbiter',  5,  2);
+  add('sniper',   6,  1.3);
+  add('tank',     7,  1.5);
+  add('hunter',   8,  1 + Math.min(1.5, (n - 8) * 0.12));
+  add('pulsar',   9,  1.2);
+  add('blinker',  11, 1.2);
+  add('warden',   12, 0.8 + Math.min(1.2, (n - 12) * 0.1));
+  add('mender',   14, 0.7);
+  add('colossus', 15, 0.4 + Math.min(1.2, (n - 15) * 0.08));
+  return w;
+}
+
+function pickWeighted(list) {
+  let total = 0;
+  for (const it of list) total += it[1];
+  let r = Math.random() * total;
+  for (const it of list) { r -= it[1]; if (r <= 0) return it[0]; }
+  return list[list.length - 1][0];
+}
+
+// Push a regular enemy into the queue; swarmers arrive as a pack.
+function queueEnemy(q, kind, delay, n) {
+  if (kind === 'swarmer') {
+    const pack = n >= 15 ? 6 : 4;
+    for (let i = 0; i < pack; i++) {
+      q.push({ kind, delay: i < pack - 1 ? 70 : delay, follow: i > 0 });
+    }
+    return 2;   // a pack takes up two "slots" of the wave budget
+  }
+  q.push({ kind, delay });
+  return 1;
+}
+
 function buildWave(n) {
   const q = [];
-  // Major boss every 5 waves
+  // Major boss every 5 waves — fewer, lighter escorts than before
   if (n % CFG.bossEvery === 0) {
-    q.push({ kind: 'boss', delay: 600 });
-    const minions = Math.min(6, 1 + Math.floor(n / 8));
+    q.push({ kind: 'boss', delay: 900 });
+    const minions = Math.min(4, 1 + Math.floor(n / 10));
     for (let i = 0; i < minions; i++) {
       const r = Math.random();
-      // Boss escorts scale up: orbiters → tanks/hunters → wardens/colossus
-      const escort = n >= 20 ? (r < 0.35 ? 'colossus' : r < 0.7 ? 'warden' : 'hunter')
-                   : n >= 15 ? (r < 0.4 ? 'warden' : r < 0.75 ? 'hunter' : 'orbiter')
-                   : n >= 10 ? (r < 0.5 ? 'tank' : r < 0.8 ? 'hunter' : 'orbiter')
+      const escort = n >= 20 ? (r < 0.35 ? 'warden' : r < 0.7 ? 'hunter' : 'tank')
+                   : n >= 15 ? (r < 0.35 ? 'hunter' : r < 0.7 ? 'tank' : 'orbiter')
+                   : n >= 10 ? (r < 0.5 ? 'tank' : 'orbiter')
                    : 'orbiter';
-      q.push({ kind: escort, delay: 750 });
+      q.push({ kind: escort, delay: 1400 });
     }
     return q;
   }
-  // Mini-boss waves at 8, 12, 16 — a tough anchor + swarm
-  const isMiniBoss = (n === 8 || n === 12 || n === 16 || (n >= 22 && (n - 22) % 5 === 2));
-  if (isMiniBoss) {
-    q.push({ kind: n >= 16 ? 'colossus' : 'tank', delay: 500 });
-    q.push({ kind: 'warden', delay: 700 });
-    const swarm = 6 + Math.floor(n / 4);
-    for (let i = 0; i < swarm; i++) {
-      const r = Math.random();
-      const k = r < 0.4 ? 'zoomer' : r < 0.7 ? 'hunter' : r < 0.9 ? 'splitter' : 'orbiter';
-      q.push({ kind: k, delay: rand(380, 620) });
+  // Mini-boss waves (8, 13, 18, 23…): a REAL mini-boss + a light swarm
+  if (isMiniBossWave(n)) {
+    const minis = miniBossesFor(n);
+    q.push({ kind: minis[0], delay: 1500 });
+    const swarm = 4 + Math.floor(n / 5);
+    const pool = enemyWeights(Math.min(n, 12));
+    for (let i = 0; i < swarm; ) {
+      i += queueEnemy(q, pickWeighted(pool), rand(700, 1100), n);
+      if (minis[1] && i >= Math.floor(swarm / 2) && !q.some(s => s.kind === minis[1])) {
+        q.push({ kind: minis[1], delay: 1500 });
+      }
     }
     return q;
   }
   const minDelay = Math.max(220, 450 - n * 12);
   const maxDelay = Math.max(420, 850 - n * 20);
   const totalBase = 5 + Math.floor(n * 1.1);
-  for (let i = 0; i < totalBase; i++) {
-    let kind;
-    const r = Math.random();
-    if (n <= 2) {
-      kind = r < 0.7 ? 'drifter' : 'zoomer';
-    } else if (n <= 4) {
-      kind = r < 0.45 ? 'drifter' : r < 0.75 ? 'zoomer' : 'splitter';
-    } else if (n <= 6) {
-      kind = r < 0.3 ? 'drifter' : r < 0.55 ? 'zoomer' : r < 0.78 ? 'splitter' : 'orbiter';
-    } else if (n <= 10) {
-      // Wave 7-10: tanks + Hunter join the mix
-      kind = r < 0.18 ? 'drifter' : r < 0.4 ? 'zoomer' : r < 0.58 ? 'splitter' : r < 0.75 ? 'orbiter' : r < 0.9 ? 'tank' : 'hunter';
-    } else if (n <= 14) {
-      // Wave 11-14: Warden joins, Hunter more common
-      kind = r < 0.12 ? 'drifter' : r < 0.32 ? 'zoomer' : r < 0.48 ? 'splitter' : r < 0.64 ? 'orbiter' : r < 0.78 ? 'hunter' : r < 0.92 ? 'tank' : 'warden';
-    } else if (n <= 19) {
-      // Wave 15-19: Colossus starts appearing; hunters + wardens common
-      kind = r < 0.08 ? 'drifter' : r < 0.25 ? 'zoomer' : r < 0.42 ? 'splitter' : r < 0.55 ? 'orbiter' : r < 0.72 ? 'hunter' : r < 0.85 ? 'tank' : r < 0.95 ? 'warden' : 'colossus';
-    } else {
-      // Wave 20+: heavy mix of chasers, colossus more common
-      kind = r < 0.05 ? 'drifter' : r < 0.18 ? 'zoomer' : r < 0.32 ? 'splitter' : r < 0.42 ? 'orbiter' : r < 0.6 ? 'hunter' : r < 0.75 ? 'tank' : r < 0.9 ? 'warden' : 'colossus';
-    }
-    q.push({ kind, delay: rand(minDelay, maxDelay) });
+  const pool = enemyWeights(n);
+  for (let i = 0; i < totalBase; ) {
+    i += queueEnemy(q, pickWeighted(pool), rand(minDelay, maxDelay), n);
   }
   return q;
 }
@@ -1527,7 +2050,9 @@ function updateWave(dt) {
     state.spawnTimer -= dt;
     if (state.spawnTimer <= 0) {
       const s = state.spawnQueue.shift();
-      state.enemies.push(spawnEnemyAtEdge(s.kind));
+      const en = spawnEnemyAtEdge(s.kind, s.follow ? state.lastSpawn : null);
+      state.lastSpawn = { x: en.x, y: en.y };
+      state.enemies.push(en);
       state.spawnTimer = s.delay;
     }
   } else {
@@ -1587,28 +2112,34 @@ function showBanner(sub, title) {
 // ---------- Collisions ----------
 // Voltage ship: when a chain-tagged bullet kills an enemy, deal damage
 // to the nearest live enemy within `range`, with a visible spark trail.
-function chainStrike(fromX, fromY, exclude, range, baseDmg) {
-  let best = null, bestD = Infinity;
-  for (const e of state.enemies) {
-    if (e === exclude || e.hp <= 0) continue;
-    const d = len(e.x - fromX, e.y - fromY);
-    if (d < range && d < bestD) { bestD = d; best = e; }
+// Chain lightning: hop from enemy to enemy up to `hops` times.  Deaths are
+// resolved by the sweep in update() so we never splice mid-collision.
+function chainStrike(fromX, fromY, exclude, range, baseDmg, hops) {
+  const visited = [exclude];
+  const dmg = Math.max(1, Math.round((baseDmg || 1) * 0.5));
+  for (let h = 0; h < (hops || 1); h++) {
+    let best = null, bestD = Infinity;
+    for (const e of state.enemies) {
+      if (visited.indexOf(e) >= 0 || e.hp <= 0) continue;
+      const d = len(e.x - fromX, e.y - fromY);
+      if (d < range && d < bestD) { bestD = d; best = e; }
+    }
+    if (!best) return;
+    visited.push(best);
+    best.hp -= dmg;
+    // Lightning visual
+    const steps = 5;
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      pushParticle({
+        x: fromX + (best.x - fromX) * t + rand(-6, 6),
+        y: fromY + (best.y - fromY) * t + rand(-6, 6),
+        vx: 0, vy: 0,
+        size: 2.6, life: 220, age: 0, color: '#fbbf24',
+      });
+    }
+    fromX = best.x; fromY = best.y;
   }
-  if (!best) return;
-  best.hp -= Math.max(1, Math.round((baseDmg || 1) * 0.7));
-  // Lightning visual
-  const steps = 9;
-  for (let i = 0; i <= steps; i++) {
-    const t = i / steps;
-    state.particles.push({
-      x: fromX + (best.x - fromX) * t + rand(-7, 7),
-      y: fromY + (best.y - fromY) * t + rand(-7, 7),
-      vx: 0, vy: 0,
-      size: 3, life: 260, age: 0, color: '#fbbf24',
-    });
-  }
-  addFloatText((fromX + best.x) / 2, (fromY + best.y) / 2 - 8, '⚡', '#fbbf24');
-  if (best.hp <= 0) killEnemy(best);
 }
 
 function vertexHitBonus(e, bx, by) {
@@ -1646,37 +2177,38 @@ function updateCollisions() {
           spawnParticles(b.x, b.y, '#ffffff', 4, 3, 280);
         }
 
-        // Ship-specific bullet effect
-        if (b.effect === 'slow') {
-          e.slowUntil = state.t + 900;
-          spawnParticles(b.x, b.y, '#c084fc', 10, 3, 500);
-        } else if (b.effect === 'explode') {
-          const aoeR = 64;
-          const aoeDmg = Math.max(1, Math.floor(baseDmg * 0.6));
+        // Ship bullet effects — these STACK on the expensive ships.
+        const fx = b.fx;
+        if (fx && fx.slow) {
+          e.slowUntil = state.t + 1300;
+          spawnParticles(b.x, b.y, '#c084fc', 5, 3, 400);
+        }
+        if (fx && fx.fire) {
+          // Ignite for damage-over-time (ticks in updateEnemy)
+          const burning = e.fireUntil && state.t < e.fireUntil;
+          e.fireDmg = Math.max(burning ? (e.fireDmg || 0) : 0, baseDmg * 0.35);
+          e.fireUntil = state.t + 2500;
+          if (!burning) e.fireLastTick = state.t;
+          spawnParticles(b.x, b.y, '#ff6b35', 5, 4, 500);
+        }
+        if (fx && fx.explode) {
+          const aoeR = 72;
+          const aoeDmg = Math.max(1, Math.ceil(baseDmg * 0.6));
           for (const e2 of state.enemies) {
             if (e2 === e) continue;
             const d = len(e2.x - b.x, e2.y - b.y);
             if (d < aoeR + e2.r) e2.hp -= aoeDmg;
           }
-          spawnParticles(b.x, b.y, '#ff8c42', 24, 8, 600);
-          shake(6);
-        } else if (b.effect === 'fire') {
-          // Inferno — ignite for DoT (handled in updateEnemy)
-          e.fireUntil = state.t + 2200;
-          e.fireLastTick = state.t;
-          e.fireDmg = baseDmg * 0.4;
-          spawnParticles(b.x, b.y, '#ff6b35', 14, 4, 600);
+          spawnParticles(b.x, b.y, '#ff8c42', 10, 7, 500);
+          if (state.shake < 3) shake(2);
         }
 
-        // Chain BEFORE deciding to splice (we need to know if e died)
         const killedThis = e.hp <= 0;
-        if (b.effect === 'chain' && killedThis) {
-          chainStrike(e.x, e.y, e, 140, baseDmg);
-        }
+        // Chain lightning jumps from the struck enemy to the next nearest
+        if (fx && fx.chain) chainStrike(e.x, e.y, e, 160, baseDmg, fx.chain);
 
         // Pierce keeps the bullet alive for up to N more enemies
-        if (b.effect === 'pierce' && (b.pierceLeft === undefined || b.pierceLeft > 0)) {
-          if (b.pierceLeft === undefined) b.pierceLeft = 2;
+        if (b.pierceLeft > 0) {
           b.pierceLeft--;
           b.hitIds = b.hitIds || [];
           b.hitIds.push(e);
@@ -1697,7 +2229,7 @@ function updateCollisions() {
   for (const e of state.enemies) {
     if (len(p.x - e.x, p.y - e.y) < e.r + p.r) {
       damagePlayer(p);
-      if (e.kind !== 'boss') { e.hp = 0; killEnemy(e, false); }
+      if (!e.big) { e.hp = 0; killEnemy(e, false); }
     }
   }
 
@@ -1709,6 +2241,22 @@ function updateCollisions() {
       state.ebullets.splice(i, 1);
     }
   }
+}
+
+// Homing bullets gently curve toward the nearest enemy ahead of them.
+function steerHoming(b) {
+  let best = null, bestD = 320;
+  for (const e of state.enemies) {
+    const d = len(e.x - b.x, e.y - b.y);
+    if (d < bestD && !(b.hitIds && b.hitIds.indexOf(e) >= 0)) { bestD = d; best = e; }
+  }
+  if (!best) return;
+  const cur = Math.atan2(b.vy, b.vx);
+  const want = Math.atan2(best.y - b.y, best.x - b.x);
+  const diff = ((want - cur + Math.PI * 3) % TAU) - Math.PI;
+  const a = cur + clamp(diff, -0.12, 0.12);
+  const sp = len(b.vx, b.vy);
+  b.vx = Math.cos(a) * sp; b.vy = Math.sin(a) * sp;
 }
 
 // ---------- Screen shake ----------
@@ -1734,6 +2282,7 @@ function update(dt) {
   // Update bullets
   for (let i = state.bullets.length - 1; i >= 0; i--) {
     const b = state.bullets[i];
+    if (b.fx && b.fx.homing) steerHoming(b);
     b.x += b.vx * state.slowmo; b.y += b.vy * state.slowmo;
     b.age += dt;
     if (b.age > b.life || b.x < -20 || b.x > state.w + 20 || b.y < -20 || b.y > state.h + 20) {
@@ -1820,44 +2369,57 @@ function draw() {
   for (const u of state.powerups) drawPowerup(u);
 
   // Bullets — with a short trail for visibility
-  ctx.shadowColor = '#7df9ff';
-  ctx.shadowBlur = 18;
+  // Lots of bullets on screen with top ships — drop the glow when it gets
+  // busy so older iPads keep a smooth frame rate.
+  ctx.shadowBlur = state.bullets.length > 60 ? 0 : 18;
+  ctx.lineCap = 'round';
   for (const b of state.bullets) {
-    // Trail
-    ctx.strokeStyle = 'rgba(125, 249, 255, 0.55)';
-    ctx.lineWidth = CFG.bullet.r * 1.4;
-    ctx.lineCap = 'round';
+    const col = b.color || '#7df9ff';
+    const br = b.small ? CFG.bullet.r * 0.65 : CFG.bullet.r;
+    ctx.shadowColor = col;
+    // Trail (in the ship's color)
+    ctx.globalAlpha = 0.55;
+    ctx.strokeStyle = col;
+    ctx.lineWidth = br * 1.4;
     ctx.beginPath();
     ctx.moveTo(b.x, b.y);
     ctx.lineTo(b.x - b.vx * 1.6, b.y - b.vy * 1.6);
     ctx.stroke();
+    ctx.globalAlpha = 1;
     // Bright core
     ctx.fillStyle = '#ffffff';
     ctx.beginPath();
-    ctx.arc(b.x, b.y, CFG.bullet.r, 0, TAU);
+    ctx.arc(b.x, b.y, br, 0, TAU);
     ctx.fill();
-    ctx.fillStyle = '#7df9ff';
+    ctx.fillStyle = col;
     ctx.beginPath();
-    ctx.arc(b.x, b.y, CFG.bullet.r * 0.6, 0, TAU);
+    ctx.arc(b.x, b.y, br * 0.6, 0, TAU);
     ctx.fill();
   }
 
-  // Enemy bullets
-  ctx.fillStyle = '#ff4d6d';
-  ctx.shadowColor = '#ff4d6d';
-  ctx.shadowBlur = 14;
+  // Enemy bullets (colored by who fired them)
+  ctx.shadowBlur = state.ebullets.length > 80 ? 0 : 14;
   for (const b of state.ebullets) {
+    const col = b.color || '#ff4d6d';
+    ctx.fillStyle = col;
+    ctx.shadowColor = col;
     ctx.beginPath();
     ctx.arc(b.x, b.y, b.r, 0, TAU);
+    ctx.fill();
+    // Hot white core so every enemy shot reads as "dangerous"
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, b.r * 0.4, 0, TAU);
     ctx.fill();
   }
   ctx.shadowBlur = 0;
 
   // Enemies
   for (const e of state.enemies) drawEnemy(e);
+  drawBigBars();
 
   // Player
-  if (state.player) drawPlayer(state.player);
+  if (state.player) { drawDrones(state.player); drawPlayer(state.player); }
 
   // Float text
   ctx.shadowBlur = 0;
@@ -2177,6 +2739,7 @@ function renderShop() {
       </div>
       <canvas class="ship-preview" data-ship="${id}" width="160" height="80"></canvas>
       <p class="desc">${def.desc}</p>
+      ${shipStatsHtml(id)}
       ${btnHtml}
     `;
     shipWrap.appendChild(card);
@@ -2194,51 +2757,74 @@ function renderShop() {
   });
 }
 
+// Stat block for a ship card — includes your pilot upgrades, so you see
+// exactly what you'd fly with.  Effects show as chips.
+function shipStatsHtml(id) {
+  const lo = computeLoadout(id);
+  const perSec = (1000 / lo.fireRate) * lo.shots;
+  const power = Math.round(perSec * lo.bulletDmg);
+  const fx = lo.fx || {};
+  const chips = Object.keys(FX_LABELS).filter(k => fx[k]).map(k => {
+    const n = typeof fx[k] === 'number' ? ` ${fx[k]}` : '';
+    return `<span class="fx-chip">${FX_LABELS[k]}${n}</span>`;
+  });
+  if (lo.shots > 1) chips.unshift(`<span class="fx-chip">🔫 ×${lo.shots} shots</span>`);
+  if (lo.drones) chips.push(`<span class="fx-chip">🛰 ${lo.drones} drone${lo.drones > 1 ? 's' : ''}</span>`);
+  return `
+    <div class="ship-stats">
+      <span title="Damage per bullet">💥 ${lo.bulletDmg}</span>
+      <span title="Lives">❤ ${lo.lives}</span>
+      <span title="Bullets per second">⚡ ${perSec.toFixed(1)}/s</span>
+      <span title="Firepower (damage per second, before effects)" class="power">🔥 ${power}</span>
+    </div>
+    ${chips.length ? `<div class="fx-chips">${chips.join('')}</div>` : ''}`;
+}
+
 // Enemy guide — list every enemy kind with a tiny preview and the
 // wave they start showing up. Mirrors what buildWave actually does.
 const ENEMY_GUIDE = [
   { kind: 'drifter',  name: 'Drifter',  when: 'Wave 1+',  desc: 'Slow pink chaser. 2 HP. The easiest enemy.' },
   { kind: 'zoomer',   name: 'Zoomer',   when: 'Wave 1+',  desc: 'Fast yellow triangle that commits to a direct dash. 1 HP.' },
+  { kind: 'weaver',   name: 'Weaver',   when: 'Wave 3+',  desc: 'Lime diamond that snakes toward you in an S-curve — tricky to hit. 2 HP.' },
   { kind: 'splitter', name: 'Splitter', when: 'Wave 3+',  desc: 'Green square. 3 HP. Splits into two small drifters when killed.' },
+  { kind: 'swarmer',  name: 'Swarmer',  when: 'Wave 4+',  desc: 'Tiny orange triangles that arrive in a PACK of 4–6. 1 HP each.' },
   { kind: 'orbiter',  name: 'Orbiter',  when: 'Wave 5+',  desc: 'Cyan circle that orbits you at distance and shoots at you. 3 HP.' },
-  { kind: 'tank',     name: 'Tank',     when: 'Wave 7+',  desc: 'Slow red octagon. 7 HP. Brings everyone else to a halt if you ignore it.' },
+  { kind: 'sniper',   name: 'Sniper',   when: 'Wave 6+',  desc: 'Blue pentagon that hangs back, shows a laser, then fires a FAST shot. Keep moving! 4 HP.' },
+  { kind: 'tank',     name: 'Tank',     when: 'Wave 7+',  desc: 'Slow red octagon. 7 HP. Soaks up bullets.' },
   { kind: 'hunter',   name: 'Hunter',   when: 'Wave 8+',  desc: 'Fast red triangle that AGGRESSIVELY chases and periodically dashes at you. 8 HP.' },
+  { kind: 'pulsar',   name: 'Pulsar',   when: 'Wave 9+',  desc: 'Violet 4-point star. Flashes white, then pulses out a ring of bullets. 6 HP.' },
+  { kind: 'blinker',  name: 'Blinker',  when: 'Wave 11+', desc: 'Heptagon that flickers and TELEPORTS right next to you. 5 HP.' },
   { kind: 'warden',   name: 'Warden',   when: 'Wave 12+', desc: 'Bulky green square that chases and BURSTS into 3 zoomers on death. 18 HP.' },
+  { kind: 'mender',   name: 'Mender',   when: 'Wave 14+', desc: 'Green plus-sign medic. Heals nearby enemies — shoot it FIRST. 8 HP.' },
   { kind: 'colossus', name: 'Colossus', when: 'Wave 15+', desc: 'Massive gold hexagon. Slow but unstoppable — it just walks straight at you. 40 HP.' },
-  { kind: 'boss',     name: 'Boss',     when: 'Wave 5, 10, 15, 20…', desc: 'Big star. Heaps of HP, radial barrages, tough escorts. Faster fire on higher waves.' },
+];
+
+const BOSS_GUIDE = [
+  { kind: 'sentinel', name: 'Sentinel', when: 'Mini-boss · Wave 8, 23, 38…',  desc: 'Glides to a spot, stops, and spins out SPIRAL bullet streams. Move around the spiral.' },
+  { kind: 'hive',     name: 'Hive Queen', when: 'Mini-boss · Wave 13, 28…',   desc: 'Slow mother ship that HATCHES swarmers and fires 3-shot spreads. Kill her fast.' },
+  { kind: 'ravager',  name: 'Ravager',  when: 'Mini-boss · Wave 18, 33…',     desc: 'Shakes + shows a red lane, then CHARGES and bursts into a bullet ring. Dodge sideways!' },
+  { kind: 'boss',     name: 'Boss',     when: 'Wave 5, 10, 15, 20…',         desc: 'Big star. Rotating rings always have a GAP — find it. Every 3rd volley is an aimed fan.' },
 ];
 
 function renderEnemyGuide() {
   const wrap = document.getElementById('enemy-grid');
   wrap.innerHTML = '';
-  for (const row of ENEMY_GUIDE) {
+  const addCard = (row, extraClass) => {
     const card = document.createElement('div');
-    card.className = 'enemy-card';
+    card.className = 'enemy-card' + (extraClass ? ' ' + extraClass : '');
     card.innerHTML = `
       <canvas data-kind="${row.kind}"></canvas>
       <div class="name">${row.name}</div>
       <div class="when">${row.when}</div>
       <div class="desc">${row.desc}</div>`;
     wrap.appendChild(card);
-  }
-  // Elite explainer card
-  const el = document.createElement('div');
-  el.className = 'enemy-card';
-  el.innerHTML = `
-    <canvas data-kind="hunter"></canvas>
-    <div class="name">⭐ Elite Variants</div>
-    <div class="when">Wave 10+ (rare)</div>
-    <div class="desc">Any enemy can spawn as an elite — 3× HP, faster, bigger, and drops double coins. Look for the white pulsing ring.</div>`;
-  wrap.appendChild(el);
-  // Mini-boss card (composite — not a single kind)
-  const mb = document.createElement('div');
-  mb.className = 'enemy-card';
-  mb.innerHTML = `
-    <canvas data-kind="tank"></canvas>
-    <div class="name">Mini-Boss Wave</div>
-    <div class="when">Wave 8, 12, 16…</div>
-    <div class="desc">Not a single enemy — a Tank + Shielder + a fast swarm spawn together. Bring power-ups.</div>`;
-  wrap.appendChild(mb);
+  };
+  for (const row of BOSS_GUIDE) addCard(row, 'enemy-card--boss');
+  for (const row of ENEMY_GUIDE) addCard(row);
+  addCard({ kind: 'hunter', name: '⭐ Elite Variants', when: 'Wave 10+ (rare)',
+    desc: 'Any regular enemy can spawn as an elite — 3× HP, faster, bigger, and drops double coins. Look for the white pulsing ring.' });
+  addCard({ kind: 'hive', name: '👑 Double Trouble', when: 'Wave 28+',
+    desc: 'From wave 28, mini-boss waves send TWO different mini-bosses at once.' });
 
   // Render each tiny preview
   wrap.querySelectorAll('canvas[data-kind]').forEach(cv => {
@@ -2264,34 +2850,15 @@ function drawEnemyPreview(canvas, kind) {
   c.strokeStyle = k.color;
   c.shadowColor = k.color;
   c.shadowBlur = 14;
-  c.lineWidth = 2.2;
-  const r = (kind === 'boss') ? 22
+  c.lineWidth = k.big ? 2.8 : 2.2;
+  const r = k.big ? 26
           : (kind === 'colossus') ? 24
           : (kind === 'tank' || kind === 'warden') ? 20
+          : (kind === 'swarmer') ? 11
           : 17;
-  if (k.shape === 'circle') {
-    c.beginPath(); c.arc(0, 0, r, 0, TAU); c.stroke();
-    c.beginPath(); c.arc(0, 0, r * 0.55, 0, TAU); c.stroke();
-  } else if (k.shape === 'star') {
-    const points = 5;
-    c.beginPath();
-    for (let i = 0; i <= points * 2; i++) {
-      const a = (i / (points * 2)) * TAU - Math.PI / 2;
-      const rr = (i % 2 === 0) ? r : r * 0.5;
-      const x = Math.cos(a) * rr, y = Math.sin(a) * rr;
-      if (i === 0) c.moveTo(x, y); else c.lineTo(x, y);
-    }
-    c.stroke();
-  } else {
-    const sides = k.shape === 'tri' ? 3 : k.shape === 'sq' ? 4 : k.shape === 'hex' ? 6 : 8;
-    c.beginPath();
-    for (let i = 0; i <= sides; i++) {
-      const a = (i / sides) * TAU - Math.PI / 2;
-      const x = Math.cos(a) * r, y = Math.sin(a) * r;
-      if (i === 0) c.moveTo(x, y); else c.lineTo(x, y);
-    }
-    c.stroke();
-  }
+  traceShape(c, k.shape, r);
+  if (kind === 'boss') traceShape(c, 'star', r * 0.7);
+  else if (k.mini) { c.rotate(0.6); c.lineWidth = 1.8; traceShape(c, k.shape, r * 0.55); }
   c.restore();
 }
 
@@ -2339,199 +2906,9 @@ function drawShipPreview(canvas, shipId) {
   c.restore();
 }
 
-// Re-implement ship drawing against a passed-in ctx (so the shop preview
-// can render without touching the global game canvas).
+// Draw a ship against any 2D context (game canvas or shop preview).
 function drawShipInto(c, shipId, r) {
-  if (shipId === 'striker') {
-    c.beginPath();
-    c.moveTo(r * 1.35, 0);
-    c.lineTo(r * 0.5, -r * 0.3);
-    c.lineTo(r * 0.7, -r * 0.95);
-    c.lineTo(-r * 0.15, -r * 0.95);
-    c.lineTo(-r * 0.4, -r * 0.45);
-    c.lineTo(-r * 0.85, -r * 0.55);
-    c.lineTo(-r * 0.95, 0);
-    c.lineTo(-r * 0.85,  r * 0.55);
-    c.lineTo(-r * 0.4,   r * 0.45);
-    c.lineTo(-r * 0.15,  r * 0.95);
-    c.lineTo(r * 0.7,    r * 0.95);
-    c.lineTo(r * 0.5,    r * 0.3);
-    c.closePath();
-    c.stroke();
-    c.beginPath();
-    c.moveTo(r * 0.7, -r * 0.75); c.lineTo(r * 1.15, -r * 0.6);
-    c.moveTo(r * 0.7,  r * 0.75); c.lineTo(r * 1.15,  r * 0.6);
-    c.stroke();
-  } else if (shipId === 'titan') {
-    c.beginPath();
-    c.moveTo(r * 1.15, 0);
-    c.lineTo(r * 0.85, -r * 0.55);
-    c.lineTo(r * 0.2, -r * 1.05);
-    c.lineTo(-r * 0.55, -r * 1.05);
-    c.lineTo(-r * 0.95, -r * 0.55);
-    c.lineTo(-r * 0.95,  r * 0.55);
-    c.lineTo(-r * 0.55,  r * 1.05);
-    c.lineTo(r * 0.2,   r * 1.05);
-    c.lineTo(r * 0.85,  r * 0.55);
-    c.closePath();
-    c.stroke();
-    c.beginPath();
-    c.moveTo(r * 0.55, -r * 0.55);
-    c.lineTo(r * 0.95, 0);
-    c.lineTo(r * 0.55,  r * 0.55);
-    c.stroke();
-    c.beginPath();
-    c.moveTo(-r * 0.95, -r * 0.3); c.lineTo(-r * 0.6, -r * 0.3);
-    c.moveTo(-r * 0.95,  r * 0.3); c.lineTo(-r * 0.6,  r * 0.3);
-    c.stroke();
-  } else if (shipId === 'crystal') {
-    c.beginPath();
-    c.moveTo(r * 1.35, 0);
-    c.lineTo(r * 0.3, -r * 0.85);
-    c.lineTo(-r * 0.85, -r * 0.5);
-    c.lineTo(-r * 0.55, 0);
-    c.lineTo(-r * 0.85,  r * 0.5);
-    c.lineTo(r * 0.3,    r * 0.85);
-    c.closePath();
-    c.stroke();
-    c.beginPath();
-    c.moveTo(r * 1.35, 0); c.lineTo(-r * 0.55, 0);
-    c.moveTo(r * 0.3, -r * 0.85); c.lineTo(r * 0.3,  r * 0.85);
-    c.stroke();
-  } else if (shipId === 'phantom') {
-    c.beginPath();
-    c.moveTo(r * 1.5, 0);
-    c.lineTo(r * 0.4, -r * 0.22);
-    c.lineTo(r * 0.05, -r * 1.0);
-    c.lineTo(-r * 0.6, -r * 0.55);
-    c.lineTo(-r * 0.85, -r * 0.18);
-    c.lineTo(-r * 0.7, 0);
-    c.lineTo(-r * 0.85,  r * 0.18);
-    c.lineTo(-r * 0.6,   r * 0.55);
-    c.lineTo(r * 0.05,   r * 1.0);
-    c.lineTo(r * 0.4,    r * 0.22);
-    c.closePath();
-    c.stroke();
-    c.beginPath();
-    c.arc(r * 0.7, 0, r * 0.14, 0, Math.PI * 2);
-    c.moveTo(r * 0.3, 0); c.lineTo(-r * 0.55, 0);
-    c.stroke();
-  } else if (shipId === 'vortex') {
-    c.beginPath();
-    c.arc(0, 0, r * 1.05, -Math.PI * 0.65, Math.PI * 0.65, false);
-    c.lineTo(r * 0.35, 0);
-    c.arc(0, 0, r * 0.55, Math.PI * 0.65, -Math.PI * 0.65, true);
-    c.closePath();
-    c.stroke();
-    c.beginPath();
-    c.arc(0, 0, r * 0.22, 0, Math.PI * 2);
-    c.stroke();
-    c.beginPath();
-    c.arc(0, 0, r * 0.42, -Math.PI * 0.3, Math.PI * 0.3);
-    c.stroke();
-  } else if (shipId === 'comet') {
-    c.beginPath();
-    c.moveTo(r * 1.4, 0);
-    c.bezierCurveTo(r * 0.9, -r * 0.55, r * 0.0, -r * 0.5, -r * 0.7, -r * 0.3);
-    c.lineTo(-r * 0.85, 0);
-    c.lineTo(-r * 0.7, r * 0.3);
-    c.bezierCurveTo(r * 0.0, r * 0.5, r * 0.9, r * 0.55, r * 1.4, 0);
-    c.closePath();
-    c.stroke();
-    c.beginPath();
-    c.moveTo(-r * 0.1, -r * 0.45);
-    c.quadraticCurveTo(-r * 0.6, -r * 0.95, -r * 0.95, -r * 0.5);
-    c.moveTo(-r * 0.1,  r * 0.45);
-    c.quadraticCurveTo(-r * 0.6,  r * 0.95, -r * 0.95,  r * 0.5);
-    c.stroke();
-    c.beginPath();
-    c.arc(r * 0.55, 0, r * 0.13, 0, Math.PI * 2);
-    c.stroke();
-  } else if (shipId === 'trident') {
-    c.beginPath();
-    c.moveTo(r * 1.4, -r * 0.55);
-    c.lineTo(r * 0.5, -r * 0.4);
-    c.lineTo(r * 1.4, 0);
-    c.lineTo(r * 0.5,  r * 0.4);
-    c.lineTo(r * 1.4,  r * 0.55);
-    c.lineTo(r * 0.35, r * 0.7);
-    c.lineTo(-r * 0.55, r * 0.6);
-    c.lineTo(-r * 0.95, 0);
-    c.lineTo(-r * 0.55, -r * 0.6);
-    c.lineTo(r * 0.35, -r * 0.7);
-    c.closePath();
-    c.stroke();
-    c.beginPath();
-    c.moveTo(r * 0.5, 0); c.lineTo(-r * 0.55, 0);
-    c.stroke();
-  } else if (shipId === 'inferno') {
-    c.beginPath();
-    c.moveTo(r * 1.3, 0);
-    c.bezierCurveTo(r * 0.7, -r * 0.4, r * 0.2, -r * 0.55, -r * 0.2, -r * 0.85);
-    c.lineTo(-r * 0.5, -r * 0.35);
-    c.lineTo(-r * 0.85, -r * 0.55);
-    c.lineTo(-r * 0.95, 0);
-    c.lineTo(-r * 0.85, r * 0.55);
-    c.lineTo(-r * 0.5, r * 0.35);
-    c.lineTo(-r * 0.2, r * 0.85);
-    c.bezierCurveTo(r * 0.2, r * 0.55, r * 0.7, r * 0.4, r * 1.3, 0);
-    c.closePath();
-    c.stroke();
-    c.beginPath();
-    c.arc(r * 0.2, 0, r * 0.32, -Math.PI * 0.6, Math.PI * 0.6);
-    c.stroke();
-  } else if (shipId === 'photon') {
-    c.beginPath();
-    c.moveTo(r * 1.4, 0);
-    c.lineTo(r * 0.2, -r * 0.85);
-    c.lineTo(-r * 0.85, -r * 0.35);
-    c.lineTo(-r * 0.85, r * 0.35);
-    c.lineTo(r * 0.2, r * 0.85);
-    c.closePath();
-    c.stroke();
-    c.beginPath();
-    c.moveTo(r * 1.4, 0); c.lineTo(-r * 0.85, 0);
-    c.moveTo(r * 0.2, -r * 0.85); c.lineTo(r * 0.2, r * 0.85);
-    c.stroke();
-  } else if (shipId === 'voltage') {
-    c.beginPath();
-    c.moveTo(r * 1.35, -r * 0.05);
-    c.lineTo(r * 0.55, -r * 0.6);
-    c.lineTo(r * 0.75, -r * 0.15);
-    c.lineTo(r * 0.05, -r * 0.85);
-    c.lineTo(-r * 0.35, -r * 0.4);
-    c.lineTo(-r * 0.85, -r * 0.55);
-    c.lineTo(-r * 0.65, 0);
-    c.lineTo(-r * 0.85, r * 0.55);
-    c.lineTo(-r * 0.35, r * 0.4);
-    c.lineTo(r * 0.05, r * 0.85);
-    c.lineTo(r * 0.75, r * 0.15);
-    c.lineTo(r * 0.55, r * 0.6);
-    c.closePath();
-    c.stroke();
-    c.beginPath();
-    c.moveTo(r * 0.4, -r * 0.2);
-    c.lineTo(-r * 0.2, r * 0.2);
-    c.stroke();
-  } else {
-    // scout
-    c.beginPath();
-    c.moveTo(r * 1.25, 0);
-    c.lineTo(r * 0.25, -r * 0.4);
-    c.lineTo(-r * 0.15, -r * 0.95);
-    c.lineTo(-r * 0.75, -r * 0.55);
-    c.lineTo(-r * 0.5,  -r * 0.18);
-    c.lineTo(-r * 0.8, 0);
-    c.lineTo(-r * 0.5,   r * 0.18);
-    c.lineTo(-r * 0.75,  r * 0.55);
-    c.lineTo(-r * 0.15,  r * 0.95);
-    c.lineTo(r * 0.25,   r * 0.4);
-    c.closePath();
-    c.stroke();
-    c.beginPath();
-    c.arc(r * 0.35, 0, r * 0.22, 0, Math.PI * 2);
-    c.stroke();
-  }
+  (SHIP_DRAW[shipId] || SHIP_DRAW.scout)(c, r);
 }
 
 function buyUpgrade(key) {

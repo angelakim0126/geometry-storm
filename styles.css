@@ -822,3 +822,30 @@ body:has(#hud:not(.hidden)) #workshop-link { display: none; }
     padding-right: max(14px, env(safe-area-inset-right));
   }
 }
+
+/* ---------- Ship stats + effect chips (shop) ---------- */
+.ship-stats {
+  display: grid;
+  grid-template-columns: repeat(4, auto);
+  justify-content: space-between;
+  gap: 4px;
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: var(--ink);
+  background: rgba(125, 249, 255, 0.06);
+  border-radius: 8px;
+  padding: 6px 8px;
+}
+.ship-stats .power { color: var(--accent-3); }
+.fx-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.fx-chip {
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(255, 93, 210, 0.12);
+  border: 1px solid rgba(255, 93, 210, 0.35);
+  color: var(--ink);
+  white-space: nowrap;
+}
+.enemy-card--boss { border-color: rgba(255, 93, 210, 0.55) !important; box-shadow: 0 0 14px rgba(255, 93, 210, 0.18); }
